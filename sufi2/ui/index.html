@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUFI-2 SWAT Calibration</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+      --border: #2e3145; --accent: #4f8ef7; --accent2: #7c5cfc;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+      --text: #e2e8f0; --muted: #94a3b8; --radius: 10px;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:2rem 1rem; }
+    .container { width:100%; max-width:920px; }
+
+    /* Header */
+    header { text-align:center; margin-bottom:2rem; }
+    header h1 { font-size:1.8rem; font-weight:700; letter-spacing:-0.5px; }
+    header h1 span { background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    header p { color:var(--muted); margin-top:.4rem; font-size:.9rem; }
+
+    /* Tabs */
+    .tabs { display:flex; gap:.25rem; margin-bottom:1.25rem; border-bottom:1px solid var(--border); padding-bottom:.5rem; }
+    .tab { padding:.45rem 1.1rem; border-radius:6px; font-size:.85rem; font-weight:600; cursor:pointer; color:var(--muted); border:none; background:transparent; transition:all .15s; }
+    .tab.active { background:var(--surface2); color:var(--text); }
+    .tab:hover:not(.active) { color:var(--text); }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* Card */
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.75rem; margin-bottom:1.5rem; }
+    .card h2 { font-size:.85rem; font-weight:600; margin-bottom:1.25rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+
+    /* Form grid */
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    @media(max-width:600px){ .form-grid { grid-template-columns:1fr; } }
+    .form-grid.full { grid-template-columns:1fr; }
+    .field { display:flex; flex-direction:column; gap:.35rem; }
+    label { font-size:.8rem; color:var(--muted); font-weight:500; }
+    label span.req { color:var(--error); margin-left:2px; }
+    input,select,textarea { background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:.9rem; padding:.55rem .75rem; outline:none; transition:border-color .15s; width:100%; }
+    input:focus,select:focus,textarea:focus { border-color:var(--accent); }
+    textarea { resize:vertical; min-height:70px; font-family:monospace; font-size:.82rem; }
+    .hint { font-size:.75rem; color:var(--muted); margin-top:.2rem; }
+    hr { border:none; border-top:1px solid var(--border); margin:1.25rem 0; }
+
+    /* Work dir row */
+    .dir-row { display:flex; gap:.5rem; align-items:stretch; }
+    .dir-row input { flex:1; }
+    .dir-browse { display:flex; align-items:center; gap:.35rem; padding:.55rem .9rem; background:var(--surface2); border:1px solid var(--border); border-radius:6px; font-size:.82rem; color:var(--muted); cursor:pointer; white-space:nowrap; transition:border-color .15s; }
+    .dir-browse:hover { border-color:var(--accent); color:var(--text); }
+    .dir-browse input[type=file] { display:none; }
+
+    /* Buttons */
+    .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.65rem 1.4rem; border:none; border-radius:8px; font-size:.9rem; font-weight:600; cursor:pointer; transition:opacity .15s,transform .1s; }
+    .btn:active { transform:scale(.97); }
+    .btn:disabled { opacity:.45; cursor:not-allowed; }
+    .btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+    .btn-secondary { background:var(--border); color:var(--text); }
+    .btn-sm { padding:.38rem .85rem; font-size:.8rem; }
+    .btn-danger { background:#450a0a; color:var(--error); border:1px solid var(--error); }
+    .actions { display:flex; gap:.75rem; flex-wrap:wrap; margin-top:1.25rem; }
+
+    /* Parameter table */
+    .param-toolbar { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; flex-wrap:wrap; }
+    .param-toolbar input[type=text] { flex:1; min-width:160px; font-size:.82rem; padding:.42rem .7rem; }
+    .param-table-wrap { overflow-x:auto; border-radius:8px; border:1px solid var(--border); }
+    table.params { width:100%; border-collapse:collapse; font-size:.84rem; }
+    table.params thead tr { background:var(--surface2); }
+    table.params th { padding:.55rem .75rem; text-align:left; color:var(--muted); font-weight:500; white-space:nowrap; }
+    table.params td { padding:.4rem .6rem; border-top:1px solid var(--border); vertical-align:middle; }
+    table.params tr:hover td { background:rgba(255,255,255,.02); }
+    table.params input[type=number] { width:90px; padding:.32rem .5rem; font-size:.82rem; -moz-appearance:textfield; }
+    table.params input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; }
+    table.params select { width:80px; padding:.32rem .4rem; font-size:.82rem; }
+    table.params input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--accent); }
+    .param-name { font-family:monospace; font-size:.82rem; color:var(--accent); }
+    .param-desc { font-size:.75rem; color:var(--muted); }
+    .badge-ext { display:inline-block; padding:.1rem .45rem; border-radius:4px; font-size:.72rem; font-weight:600; font-family:monospace; }
+    .ext-mgt { background:#1e3a1e; color:#4ade80; }
+    .ext-gw  { background:#1e2e4a; color:#60a5fa; }
+    .ext-sol { background:#3a2a1e; color:#fb923c; }
+    .ext-hru { background:#2a1e3a; color:#c084fc; }
+    .ext-rte { background:#3a1e2a; color:#f472b6; }
+    .ext-bsn { background:#2a3a1e; color:#a3e635; }
+    .sel-count { font-size:.8rem; color:var(--muted); margin-left:auto; }
+
+    /* Status */
+    .badge { display:inline-block; padding:.2rem .65rem; border-radius:999px; font-size:.75rem; font-weight:600; }
+    .badge-queued  { background:#334155; color:var(--muted); }
+    .badge-running { background:#1e3a5f; color:var(--accent); }
+    .badge-done    { background:#14532d; color:var(--success); }
+    .badge-error   { background:#450a0a; color:var(--error); }
+    .progress-wrap { background:var(--border); border-radius:999px; height:8px; overflow:hidden; margin:.75rem 0; }
+    .progress-bar  { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:999px; transition:width .4s ease; }
+    .log-console { background:#0a0c14; border:1px solid var(--border); border-radius:8px; padding:.75rem 1rem; font-family:'JetBrains Mono','Fira Code',monospace; font-size:.78rem; color:#a8b4c8; height:260px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+    .log-console .log-error { color:var(--error); }
+    .log-console .log-ok    { color:var(--success); }
+
+    /* Jobs table */
+    table.jobs { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.jobs th { text-align:left; padding:.5rem .75rem; color:var(--muted); font-weight:500; border-bottom:1px solid var(--border); }
+    table.jobs td { padding:.6rem .75rem; border-bottom:1px solid var(--border); }
+    table.jobs tr:last-child td { border-bottom:none; }
+    table.jobs tr:hover td { background:rgba(255,255,255,.02); }
+
+    /* Toast */
+    #toast { position:fixed; bottom:1.5rem; right:1.5rem; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:.75rem 1.25rem; font-size:.85rem; opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; }
+    #toast.show { opacity:1; }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+<!-- Cold-start wake-up overlay -->
+<div id="wakeOverlay" style="
+  position:fixed;inset:0;z-index:999;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;
+">
+  <div style="font-size:2rem">🌊</div>
+  <div style="font-weight:700;font-size:1.1rem">SUFI-2 SWAT Calibration</div>
+  <div style="color:var(--muted);font-size:.88rem" id="wakeMsg">Connecting to server…</div>
+  <div style="width:200px;background:var(--border);border-radius:999px;height:4px;overflow:hidden;">
+    <div id="wakeBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px;transition:width .4s ease;"></div>
+  </div>
+  <div style="font-size:.75rem;color:var(--muted);margin-top:.5rem" id="wakeNote"></div>
+</div>
+
+<div class="container">
+
+  <header>
+    <h1>SUFI-2 <span>SWAT Calibration</span></h1>
+    <p>Configure, submit, and monitor multi-reach calibration runs</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('config')">⚙ Configuration</button>
+    <button class="tab" onclick="switchTab('params')">🎛 Parameters</button>
+    <button class="tab" onclick="switchTab('monitor')">📊 Monitor</button>
+    <button class="tab" onclick="switchTab('jobs')">📋 Jobs</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 1 — Configuration                                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-config">
+    <div class="card">
+      <h2>SWAT Files Directory</h2>
+
+      <!-- ── Option A: server path ── -->
+      <div class="field" style="margin-bottom:1rem">
+        <label>txtInout Path <span class="req">*</span>
+          <span style="font-weight:400;color:var(--muted)"> — type or browse to your txtInout folder</span>
+        </label>
+        <div class="dir-row">
+          <input type="text" id="work_dir"
+            placeholder="/data/txtInout  or  C:\Users\you\project\txtInout"
+            value="."
+            oninput="clearScan()" />
+          <label class="dir-browse" title="Select any file inside your txtInout folder — the folder path is extracted">
+            📂 Browse
+            <input type="file" id="folderPicker" webkitdirectory multiple onchange="handleFolderPick(this)" />
+          </label>
+          <button class="btn btn-secondary btn-sm" onclick="scanDir()" id="scanBtn" style="white-space:nowrap">🔍 Scan</button>
+        </div>
+        <span class="hint">
+          <strong>Server path:</strong> type the full path to the folder containing your SWAT files, then click <strong>Scan</strong> to auto-detect everything.
+          &nbsp;|&nbsp;
+          <strong>Upload instead:</strong> use the upload section below.
+        </span>
+      </div>
+
+      <!-- ── Scan results panel ── -->
+      <div id="scanPanel" class="hidden" style="margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;">
+          <span id="scanStatusIcon" style="font-size:1.3rem">⏳</span>
+          <span id="scanStatusText" style="font-size:.9rem;font-weight:600"></span>
+        </div>
+        <div id="scanGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.5rem;"></div>
+        <div id="scanMessages" style="margin-top:.75rem;font-size:.8rem;"></div>
+      </div>
+
+      <hr />
+
+      <!-- ── Option B: upload ── -->
+      <div class="field">
+        <label>Upload SWAT Files
+          <span style="font-weight:400;color:var(--muted)"> — alternative to typing a server path</span>
+        </label>
+        <label class="dir-browse" style="width:fit-content;cursor:pointer;">
+          📁 Select all SWAT files
+          <input type="file" id="swatFileUpload" multiple
+            accept=".csv,.rch,.cio,.mgt,.gw,.sol,.hru,.rte,.bsn,.txt,.exe"
+            onchange="handleFileUpload(this)" />
+        </label>
+        <div id="uploadedFileList" style="margin-top:.5rem;font-size:.78rem;color:var(--muted);"></div>
+        <span class="hint">
+          Select all files at once:
+          <code>output.rch</code>, <code>file.cio</code>,
+          <code>observed_flow_rch13.csv</code> … <code>observed_flow_rchN.csv</code>,
+          <code>*.mgt</code> <code>*.gw</code> <code>*.sol</code> <code>*.rte</code> <code>*.hru</code> <code>*.bsn</code>
+          (and optionally <code>swat2012.exe</code> / <code>par_inf.txt</code>).
+          Files are uploaded with the job — no server path needed.
+        </span>
+      </div>
+
+      <hr />
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Results Directory</label>
+          <input type="text" id="results_dir" value="sufi2_results" />
+          <span class="hint">Relative to txtInout path</span>
+        </div>
+        <div class="field">
+          <label>SWAT Executable <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+          <input type="text" id="swat_exe" placeholder="Auto-detected from txtInout folder" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Calibration Settings</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label>Iterations</label>
+          <input type="number" id="iterations" value="3" min="1" max="50" />
+        </div>
+        <div class="field">
+          <label>Samples per Iteration</label>
+          <input type="number" id="n_samples" value="500" min="10" max="5000" />
+        </div>
+        <div class="field">
+          <label>Objective Function</label>
+          <select id="obj_func">
+            <option value="NSE" selected>NSE — Nash-Sutcliffe Efficiency</option>
+            <option value="KGE">KGE — Kling-Gupta Efficiency</option>
+            <option value="R2">R² — Coefficient of Determination</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Top Fraction</label>
+          <input type="number" id="top_fraction" value="0.10" min="0.01" max="0.99" step="0.01" />
+          <span class="hint">Fraction of best runs used to narrow ranges</span>
+        </div>
+        <div class="field">
+          <label>Warm-up Years</label>
+          <input type="number" id="warmup_years" value="3" min="0" max="10" />
+        </div>
+        <div class="field">
+          <label>Random Seed</label>
+          <input type="number" id="seed" value="42" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Simulation Periods</h2>
+      <div class="form-grid">
+        <div class="field"><label>Calibration Start</label><input type="date" id="calib_start" value="1993-01-01" /></div>
+        <div class="field"><label>Calibration End</label><input type="date" id="calib_end" value="2001-12-31" /></div>
+        <div class="field"><label>Validation Start</label><input type="date" id="valid_start" value="2002-01-01" /></div>
+        <div class="field"><label>Validation End</label><input type="date" id="valid_end" value="2005-12-31" /></div>
+        <div class="field"><label>Hindcast Start <span style="color:var(--muted);font-size:.75rem">(optional)</span></label><input type="date" id="hind_start" /></div>
+        <div class="field"><label>Hindcast End</label><input type="date" id="hind_end" /></div>
+        <div class="field"><label>Forecast Start <span style="color:var(--muted);font-size:.75rem">(optional)</span></label><input type="date" id="fore_start" /></div>
+        <div class="field"><label>Forecast End</label><input type="date" id="fore_end" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Reaches & Weights</h2>
+      <div class="form-grid full">
+        <div class="field">
+          <label>Reach IDs (optional)</label>
+          <input type="text" id="reach_ids" placeholder="e.g. 13,15,16,17  — leave blank to auto-detect" />
+        </div>
+        <div class="field">
+          <label>Reach Weights (optional JSON)</label>
+          <textarea id="reach_weights" placeholder='{"13": 0.25, "15": 0.25, "16": 0.25, "17": 0.25}  — must sum to 1.0'></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="submitRun()">▶ Run Calibration</button>
+      <button class="btn btn-secondary" onclick="downloadConfig()">⬇ config.yaml</button>
+      <button class="btn btn-secondary" onclick="downloadParInf()">⬇ par_inf.txt</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 2 — Parameters                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-params">
+    <div class="card">
+      <h2>Parameter Selection & Ranges</h2>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem;">
+        Check the parameters you want to calibrate, then set their min/max ranges and change type.
+        Unchecked parameters are excluded from the LHS sampling.
+        Changes here are included automatically when you run or export config.
+      </p>
+
+      <div class="param-toolbar">
+        <input type="text" id="paramSearch" placeholder="🔍  Filter parameters…" oninput="filterParams()" />
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(true)">Select All</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(false)">Deselect All</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetRanges()">Reset Ranges</button>
+        <span class="sel-count" id="selCount">0 selected</span>
+      </div>
+
+      <div class="param-table-wrap">
+        <table class="params" id="paramTable">
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="checkAll" onchange="toggleAll(this)" title="Toggle all" /></th>
+              <th>Parameter</th>
+              <th>File</th>
+              <th>Min</th>
+              <th>Max</th>
+              <th>Change Type</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="paramBody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem">Loading parameters…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:.75rem;font-size:.78rem;color:var(--muted);">
+        <strong style="color:var(--text)">Change types:</strong>
+        &nbsp;
+        <code style="color:var(--accent)">v</code> = replace value &nbsp;|&nbsp;
+        <code style="color:var(--accent)">r</code> = relative: original × (1 + val) &nbsp;|&nbsp;
+        <code style="color:var(--accent)">a</code> = additive: original + val
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 3 — Monitor                                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-monitor">
+    <div class="card hidden" id="jobCard">
+      <h2>Active Job</h2>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <span style="font-family:monospace;color:var(--accent);" id="jobId">—</span>
+        <span class="badge badge-queued" id="jobBadge">queued</span>
+        <span id="jobProgress" style="color:var(--muted);font-size:.85rem;">0%</span>
+        <button class="btn btn-secondary btn-sm" onclick="downloadResults()" id="dlBtn" disabled>⬇ Download Results</button>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+      <div class="log-console" id="logConsole">Waiting for logs…</div>
+    </div>
+    <div class="card" id="noJobCard">
+      <p style="color:var(--muted);text-align:center;padding:1.5rem;">No active job. Go to <strong>Configuration</strong> and click <strong>Run Calibration</strong>.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- TAB 4 — Jobs                                                          -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-jobs">
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        All Jobs
+        <button class="btn btn-secondary btn-sm" onclick="loadJobs()">↻ Refresh</button>
+      </h2>
+      <table class="jobs">
+        <thead><tr><th>Job ID</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+        <tbody id="jobsBody"><tr><td colspan="4" style="color:var(--muted);text-align:center;padding:1.5rem">No jobs yet</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════════════════════
+let allParams    = [];   // [{name, min, max, change_type, selected, _origMin, _origMax}, …]
+let activeJobId  = null;
+let sseSource    = null;
+let pollTimer    = null;
+
+// ════════════════════════════════════════════════════════════════════════════
+// Tabs
+// ════════════════════════════════════════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const ids = ['config','params','monitor','jobs'];
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'params' && allParams.length === 0) loadParams();
+  if (id === 'jobs') loadJobs();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Work Directory — folder browse
+// ════════════════════════════════════════════════════════════════════════════
+function handleFolderPick(input) {
+  if (!input.files || input.files.length === 0) return;
+  // Extract folder path from the first file's webkitRelativePath or name
+  const file = input.files[0];
+  let folderPath = '';
+
+  if (file.webkitRelativePath) {
+    // webkitRelativePath = "foldername/filename.ext"
+    // We want the absolute-ish path — but browsers only give relative paths.
+    // We show the top-level folder name as a hint and let the user confirm/edit.
+    const parts = file.webkitRelativePath.split('/');
+    folderPath = parts[0];  // top-level folder name
+  } else {
+    folderPath = file.name;
+  }
+
+  const el = document.getElementById('work_dir');
+  el.value = folderPath;
+  el.focus();
+  // Select all so user can immediately overwrite with full path if needed
+  el.select();
+  toast(`Folder "${folderPath}" set. If running locally, paste the full path here.`, 'info');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Parameters
+// ════════════════════════════════════════════════════════════════════════════
+
+// Human-readable descriptions keyed by parameter name
+const PARAM_DESCS = {
+  'CN2.mgt':     'Curve Number — controls surface runoff',
+  'ALPHA_BF.gw': 'Baseflow recession constant',
+  'GW_DELAY.gw': 'Groundwater delay (days)',
+  'GWQMN.gw':    'Threshold depth for return flow (mm)',
+  'GW_REVAP.gw': 'Revap coefficient',
+  'REVAPMN.gw':  'Threshold depth for revap (mm)',
+  'SOL_AWC.sol': 'Available water capacity of soil layer',
+  'SOL_K.sol':   'Saturated hydraulic conductivity',
+  'SOL_BD.sol':  'Moist bulk density',
+  'ESCO.hru':    'Soil evaporation compensation factor',
+  'EPCO.hru':    'Plant uptake compensation factor',
+  'CH_N2.rte':   "Manning's n for main channel",
+  'CH_K2.rte':   'Effective hydraulic conductivity of channel',
+  'SURLAG.bsn':  'Surface runoff lag coefficient',
+  'SMFMX.bsn':   'Max melt rate for snow (summer)',
+  'SPCON.bsn':   'Max re-entrained sediment in channel',
+  'SPEXP.bsn':   'Channel re-entrainment exponent',
+  'CH_EROD.rte': 'Channel erodibility factor',
+  'CH_COV.rte':  'Channel cover factor',
+  'USLE_P.mgt':  'USLE support practice factor',
+};
+
+function extClass(name) {
+  const ext = name.split('.')[1] || '';
+  return 'badge-ext ext-' + ext;
+}
+
+async function loadParams() {
+  try {
+    const res  = await fetch('/parameters');
+    const data = await res.json();
+    allParams = data.parameters.map(p => ({
+      ...p,
+      selected: true,
+      _origMin: p.min,
+      _origMax: p.max,
+    }));
+    renderParamTable();
+    updateSelCount();
+  } catch(e) {
+    document.getElementById('paramBody').innerHTML =
+      '<tr><td colspan="7" style="color:var(--error);text-align:center;padding:1rem">Failed to load parameters from API</td></tr>';
+  }
+}
+
+function renderParamTable(filter = '') {
+  const tbody = document.getElementById('paramBody');
+  const q = filter.toLowerCase();
+  const visible = allParams.filter(p => !q || p.name.toLowerCase().includes(q));
+
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1rem">No matching parameters</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = visible.map((p, vi) => {
+    const gi = allParams.indexOf(p);  // global index
+    const ext = p.name.split('.')[1] || '';
+    return `
+    <tr data-idx="${gi}">
+      <td><input type="checkbox" ${p.selected ? 'checked' : ''} onchange="toggleParam(${gi}, this.checked)" /></td>
+      <td><span class="param-name">${p.name.split('.')[0]}</span></td>
+      <td><span class="${extClass(p.name)}">.${ext}</span></td>
+      <td><input type="number" step="any" value="${p.min}" oninput="updateParam(${gi},'min',this.value)" style="${!p.selected?'opacity:.4':''}" /></td>
+      <td><input type="number" step="any" value="${p.max}" oninput="updateParam(${gi},'max',this.value)" style="${!p.selected?'opacity:.4':''}" /></td>
+      <td>
+        <select onchange="updateParam(${gi},'change_type',this.value)" style="${!p.selected?'opacity:.4':''}">
+          <option value="v" ${p.change_type==='v'?'selected':''}>v</option>
+          <option value="r" ${p.change_type==='r'?'selected':''}>r</option>
+          <option value="a" ${p.change_type==='a'?'selected':''}>a</option>
+        </select>
+      </td>
+      <td><span class="param-desc">${PARAM_DESCS[p.name] || ''}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function updateParam(idx, field, val) {
+  if (field === 'min' || field === 'max') allParams[idx][field] = parseFloat(val);
+  else allParams[idx][field] = val;
+}
+
+function toggleParam(idx, checked) {
+  allParams[idx].selected = checked;
+  updateSelCount();
+  // dim/undim row inputs
+  renderParamTable(document.getElementById('paramSearch').value);
+}
+
+function filterParams() {
+  renderParamTable(document.getElementById('paramSearch').value);
+}
+
+function selectAll(state) {
+  allParams.forEach(p => p.selected = state);
+  updateSelCount();
+  renderParamTable(document.getElementById('paramSearch').value);
+  document.getElementById('checkAll').checked = state;
+}
+
+function toggleAll(cb) { selectAll(cb.checked); }
+
+function resetRanges() {
+  allParams.forEach(p => { p.min = p._origMin; p.max = p._origMax; });
+  renderParamTable(document.getElementById('paramSearch').value);
+  toast('Ranges reset to defaults', 'info');
+}
+
+function updateSelCount() {
+  const n = allParams.filter(p => p.selected).length;
+  document.getElementById('selCount').textContent = `${n} / ${allParams.length} selected`;
+}
+
+function getSelectedParams() {
+  return allParams.filter(p => p.selected).map(p => ({
+    name: p.name, min: p.min, max: p.max, change_type: p.change_type
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Build config from form
+// ════════════════════════════════════════════════════════════════════════════
+function buildConfig() {
+  const rw_raw = document.getElementById('reach_weights').value.trim();
+  let reach_weights = null;
+  if (rw_raw) {
+    try { reach_weights = JSON.parse(rw_raw); }
+    catch { toast('Invalid reach_weights JSON', 'error'); return null; }
+  }
+
+  const hind_s = document.getElementById('hind_start').value;
+  const hind_e = document.getElementById('hind_end').value;
+  const fore_s = document.getElementById('fore_start').value;
+  const fore_e = document.getElementById('fore_end').value;
+
+  const periods = {
+    calibration: { start: document.getElementById('calib_start').value, end: document.getElementById('calib_end').value },
+    validation:  { start: document.getElementById('valid_start').value, end: document.getElementById('valid_end').value },
+  };
+  if (hind_s && hind_e) periods.hindcast = { start: hind_s, end: hind_e };
+  if (fore_s && fore_e) periods.forecast = { start: fore_s, end: fore_e };
+
+  const swat_exe = document.getElementById('swat_exe').value.trim();
+  const reach_ids_raw = document.getElementById('reach_ids').value.trim();
+
+  return {
+    paths: {
+      work_dir:    document.getElementById('work_dir').value.trim() || '.',
+      results_dir: document.getElementById('results_dir').value.trim() || 'sufi2_results',
+      swat_exe:    swat_exe || null,
+      par_inf:     null,   // params come from the UI table, not a file
+    },
+    calibration: {
+      iterations:    parseInt(document.getElementById('iterations').value),
+      n_samples:     parseInt(document.getElementById('n_samples').value),
+      obj_func:      document.getElementById('obj_func').value,
+      top_fraction:  parseFloat(document.getElementById('top_fraction').value),
+      warmup_years:  parseInt(document.getElementById('warmup_years').value),
+      seed:          parseInt(document.getElementById('seed').value),
+      reach_weights: reach_weights,
+    },
+    periods,
+    reach_ids: reach_ids_raw ? reach_ids_raw.split(',').map(x => parseInt(x.trim())).filter(Boolean) : null,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Submit run
+// ════════════════════════════════════════════════════════════════════════════
+// Uploaded SWAT files store
+let uploadedFiles = [];
+
+function handleFileUpload(input) {
+  uploadedFiles = Array.from(input.files);
+  const list = document.getElementById('uploadedFileList');
+  if (!uploadedFiles.length) { list.textContent = ''; return; }
+  list.innerHTML = uploadedFiles.map(f =>
+    `<span style="display:inline-block;margin:.15rem .3rem;padding:.1rem .5rem;background:var(--surface2);border-radius:4px;font-family:monospace;">${f.name}</span>`
+  ).join('');
+  toast(`${uploadedFiles.length} file(s) staged for upload`, 'ok');
+}
+
+async function submitRun() {
+  if (allParams.length === 0) await loadParams();
+  const cfg     = buildConfig();
+  if (!cfg) return;
+  const selParams = getSelectedParams();
+  if (selParams.length === 0) { toast('Select at least one parameter', 'error'); return; }
+
+  const payload = { ...cfg, _selected_params: selParams };
+
+  const fd = new FormData();
+  fd.append('config_json', JSON.stringify(payload));
+
+  // Attach any staged SWAT files
+  for (const f of uploadedFiles) {
+    fd.append('data_files', f, f.name);
+  }
+
+  try {
+    const res  = await fetch('/run', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { toast(data.detail || 'Submission failed', 'error'); return; }
+    activeJobId = data.job_id;
+    switchTab('monitor');
+    showJobCard(activeJobId);
+    startSSE(activeJobId);
+    startPoll(activeJobId);
+    toast(`Job ${activeJobId} queued!`, 'ok');
+  } catch(e) {
+    toast('Network error: ' + e.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Job card / monitor
+// ════════════════════════════════════════════════════════════════════════════
+function showJobCard(jobId) {
+  document.getElementById('jobCard').classList.remove('hidden');
+  document.getElementById('noJobCard').classList.add('hidden');
+  document.getElementById('jobId').textContent = jobId;
+  document.getElementById('logConsole').textContent = '';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('jobProgress').textContent = '0%';
+  document.getElementById('dlBtn').disabled = true;
+  setBadge('queued');
+}
+
+function setBadge(status) {
+  const el = document.getElementById('jobBadge');
+  el.textContent = status;
+  el.className   = `badge badge-${status}`;
+}
+
+function startSSE(jobId) {
+  if (sseSource) sseSource.close();
+  const con = document.getElementById('logConsole');
+  sseSource = new EventSource(`/logs/${jobId}`);
+  sseSource.onmessage = e => {
+    const line = document.createElement('div');
+    line.textContent = e.data;
+    if (e.data.includes('ERROR')) line.className = 'log-error';
+    if (e.data.includes('complete') || e.data.includes('✓')) line.className = 'log-ok';
+    con.appendChild(line);
+    con.scrollTop = con.scrollHeight;
+    if (e.data.startsWith('[STREAM END')) sseSource.close();
+  };
+  sseSource.onerror = () => sseSource.close();
+}
+
+function startPoll(jobId) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const res  = await fetch(`/status/${jobId}`);
+      const data = await res.json();
+      const pct  = data.progress || 0;
+      document.getElementById('progressBar').style.width = pct + '%';
+      document.getElementById('jobProgress').textContent = pct.toFixed(1) + '%';
+      setBadge(data.status);
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        document.getElementById('dlBtn').disabled = false;
+        toast('Calibration complete! ✓', 'ok');
+        loadJobs();
+      } else if (data.status === 'error') {
+        clearInterval(pollTimer);
+        toast('Job failed: ' + (data.error || 'unknown error'), 'error');
+        loadJobs();
+      }
+    } catch {}
+  }, 2000);
+}
+
+function downloadResults() {
+  if (activeJobId) window.location.href = `/results/${activeJobId}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Exports
+// ════════════════════════════════════════════════════════════════════════════
+function downloadConfig() {
+  const cfg = buildConfig();
+  if (!cfg) return;
+  function toYaml(obj, indent = 0) {
+    const pad = '  '.repeat(indent);
+    return Object.entries(obj).map(([k, v]) => {
+      if (v === null) return `${pad}${k}: null`;
+      if (typeof v === 'object' && !Array.isArray(v)) return `${pad}${k}:\n${toYaml(v, indent+1)}`;
+      if (Array.isArray(v)) return `${pad}${k}: [${v.join(', ')}]`;
+      return `${pad}${k}: ${v}`;
+    }).join('\n');
+  }
+  const blob = new Blob([toYaml(cfg)], { type: 'text/yaml' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'config.yaml' });
+  a.click();
+}
+
+function downloadParInf() {
+  if (allParams.length === 0) { toast('Load parameters first (visit Parameters tab)', 'info'); return; }
+  const sel = getSelectedParams();
+  if (!sel.length) { toast('No parameters selected', 'error'); return; }
+  const lines = [
+    '# par_inf.txt — SUFI-2 parameter ranges',
+    '# name                min        max    change_type',
+    ...sel.map(p => `${p.name.padEnd(20)} ${String(p.min).padStart(10)} ${String(p.max).padStart(10)}  ${p.change_type}`)
+  ];
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/plain' });
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'par_inf.txt' });
+  a.click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Jobs list
+// ════════════════════════════════════════════════════════════════════════════
+async function loadJobs() {
+  try {
+    const jobs = await (await fetch('/jobs')).json();
+    const tbody = document.getElementById('jobsBody');
+    if (!jobs.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:1.5rem">No jobs yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = jobs.map(j => `
+      <tr>
+        <td style="font-family:monospace;color:var(--accent)">${j.job_id}</td>
+        <td><span class="badge badge-${j.status}">${j.status}</span></td>
+        <td>${j.progress}%</td>
+        <td style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="reattach('${j.job_id}')">View</button>
+          ${j.status==='done' ? `<button class="btn btn-secondary btn-sm" onclick="window.location='/results/${j.job_id}'">⬇ ZIP</button>` : ''}
+        </td>
+      </tr>`).join('');
+  } catch {}
+}
+
+function reattach(jobId) {
+  activeJobId = jobId;
+  switchTab('monitor');
+  showJobCard(jobId);
+  startSSE(jobId);
+  startPoll(jobId);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Toast
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.color = type==='error' ? 'var(--error)' : type==='ok' ? 'var(--success)' : 'var(--text)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Folder browse — extract folder name from file picker
+// ════════════════════════════════════════════════════════════════════════════
+function handleFolderPick(input) {
+  if (!input.files || !input.files.length) return;
+  const file = input.files[0];
+  let folder = '';
+  if (file.webkitRelativePath) {
+    folder = file.webkitRelativePath.split('/')[0];
+  } else {
+    folder = file.name;
+  }
+  const el = document.getElementById('work_dir');
+  el.value = folder;
+  el.select();
+  clearScan();
+  toast(`Folder name set to "${folder}". Confirm or paste the full server path, then click Scan.`, 'info');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Directory scan
+// ════════════════════════════════════════════════════════════════════════════
+function clearScan() {
+  document.getElementById('scanPanel').classList.add('hidden');
+}
+
+async function scanDir() {
+  const path = document.getElementById('work_dir').value.trim() || '.';
+  const btn  = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning…';
+
+  document.getElementById('scanPanel').classList.remove('hidden');
+  document.getElementById('scanStatusIcon').textContent = '⏳';
+  document.getElementById('scanStatusText').textContent = `Scanning ${path} …`;
+  document.getElementById('scanGrid').innerHTML = '';
+  document.getElementById('scanMessages').innerHTML = '';
+
+  try {
+    const res  = await fetch(`/scan?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    renderScan(data);
+  } catch(e) {
+    document.getElementById('scanStatusIcon').textContent = '❌';
+    document.getElementById('scanStatusText').textContent = 'Scan failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Scan';
+  }
+}
+
+function renderScan(data) {
+  const icon  = document.getElementById('scanStatusIcon');
+  const text  = document.getElementById('scanStatusText');
+  const grid  = document.getElementById('scanGrid');
+  const msgs  = document.getElementById('scanMessages');
+
+  if (!data.exists) {
+    icon.textContent = '❌';
+    text.textContent = `Directory not found: ${data.path}`;
+    return;
+  }
+
+  // Status icon
+  if (data.ready) {
+    icon.textContent = '✅';
+    text.innerHTML   = `<span style="color:var(--success)">Ready</span> — ${data.path}`;
+  } else {
+    icon.textContent = '⚠️';
+    text.innerHTML   = `<span style="color:var(--warning)">Issues found</span> — ${data.path}`;
+  }
+
+  // File inventory cards
+  const FILE_LABELS = {
+    file_cio:       { label: 'file.cio',            required: false },
+    output_rch:     { label: 'output.rch',           required: true  },
+    observed_flow:  { label: 'observed_flow_rchN.csv', required: true  },
+    mgt:            { label: '*.mgt',                required: false },
+    gw:             { label: '*.gw',                 required: false },
+    sol:            { label: '*.sol',                required: false },
+    hru:            { label: '*.hru',                required: false },
+    rte:            { label: '*.rte',                required: false },
+    bsn:            { label: '*.bsn',                required: false },
+    par_inf:        { label: 'par_inf.txt',          required: false },
+    swat_exe:       { label: 'swat_exe',             required: false },
+  };
+
+  grid.innerHTML = Object.entries(FILE_LABELS).map(([key, meta]) => {
+    const f    = data.files[key] || {};
+    const ok   = f.found;
+    const req  = meta.required;
+    const bg   = ok ? '#14532d' : req ? '#450a0a' : '#1e2535';
+    const col  = ok ? 'var(--success)' : req ? 'var(--error)' : 'var(--muted)';
+    const icon = ok ? '✓' : req ? '✗' : '–';
+
+    let detail = '';
+    if (key === 'observed_flow' && ok)  detail = `${f.count} file(s): ${(f.names||[]).join(', ')}`;
+    else if (key === 'output_rch' && ok) detail = f.size_kb ? `${f.size_kb} KB` : '';
+    else if (ok && f.name)               detail = f.name;
+    else if (ok && f.count !== undefined) detail = `${f.count} file(s)`;
+    else if (!ok && f.note)              detail = f.note;
+
+    return `
+    <div style="background:${bg};border-radius:7px;padding:.6rem .85rem;border:1px solid ${ok?'#166534':req?'#7f1d1d':'var(--border)'}">
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <span style="color:${col};font-weight:700;font-size:1rem">${icon}</span>
+        <span style="font-family:monospace;font-size:.8rem;color:var(--text)">${meta.label}</span>
+        ${req ? '' : '<span style="font-size:.7rem;color:var(--muted)">(optional)</span>'}
+      </div>
+      ${detail ? `<div style="font-size:.73rem;color:var(--muted);margin-top:.2rem;word-break:break-all">${detail}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Errors & warnings
+  let msgHtml = '';
+  for (const e of data.errors)   msgHtml += `<div style="color:var(--error);margin:.2rem 0">✗ ${e}</div>`;
+  for (const w of data.warnings) msgHtml += `<div style="color:var(--warning);margin:.2rem 0">⚠ ${w}</div>`;
+  msgs.innerHTML = msgHtml;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wake-up / cold-start handler
+// ════════════════════════════════════════════════════════════════════════════
+async function waitForServer(maxWaitMs = 90000) {
+  const overlay = document.getElementById('wakeOverlay');
+  const msg     = document.getElementById('wakeMsg');
+  const bar     = document.getElementById('wakeBar');
+  const note    = document.getElementById('wakeNote');
+  const start   = Date.now();
+  let   attempt = 0;
+
+  while (Date.now() - start < maxWaitMs) {
+    attempt++;
+    const elapsed = Date.now() - start;
+    const pct     = Math.min((elapsed / maxWaitMs) * 100, 95);
+    bar.style.width = pct + '%';
+
+    if (elapsed > 5000) {
+      msg.textContent  = 'Server is waking up — this takes ~30s on first load…';
+      note.textContent = `Attempt ${attempt} · ${Math.round(elapsed/1000)}s elapsed`;
+    }
+
+    try {
+      const res = await fetch('/health', { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        bar.style.width = '100%';
+        msg.textContent = 'Connected ✓';
+        await new Promise(r => setTimeout(r, 350));
+        overlay.style.transition = 'opacity .4s';
+        overlay.style.opacity    = '0';
+        await new Promise(r => setTimeout(r, 400));
+        overlay.style.display = 'none';
+        return true;
+      }
+    } catch {}
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  msg.textContent  = 'Server not responding after 90s.';
+  note.innerHTML   = 'Check your Render deployment or <a href="/health" style="color:var(--accent)">/health</a>.';
+  bar.style.background = 'var(--error)';
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════════
+waitForServer().then(ok => {
+  if (ok) {
+    loadParams();
+    loadJobs();
+    setInterval(loadJobs, 15000);
+  }
+});
+</script>
+</body>
+</html>
