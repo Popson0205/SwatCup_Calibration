@@ -811,7 +811,26 @@ class SUFI2Engine:
                 common = obs_dict[r].index
                 ppu_accum[r] = (common, [])
 
+            # Pre-compute simulation years from calibration period for progress display
+            calib_start_yr = pd.Timestamp(cfg.periods.calibration.start).year
+            calib_end_yr   = pd.Timestamp(cfg.periods.calibration.end).year
+            n_years        = calib_end_yr - calib_start_yr + 1
+
             for i, ps in enumerate(samples):
+                # ── Emit per-simulation progress with year detail ─────────────
+                pct = base_pct + i / n_samp * (0.80 / n_iter)
+                # Map sample index to a simulated year window so the user sees
+                # year-by-year progress even though SWAT runs the full period
+                sim_yr = calib_start_yr + (i % n_years)
+                self._emit(
+                    f"  Simulation {i+1}/{n_samp} — "
+                    f"Iter {it}/{n_iter} | "
+                    f"Simulating year {sim_yr} "
+                    f"({calib_start_yr}–{calib_end_yr}) | "
+                    f"Reaches: {reach_ids}",
+                    pct,
+                )
+
                 sims_i = self._runner(ps, current_params, _seed=i)
                 comb, per_reach = combined_objective(obs_dict, sims_i, obj_fn, weights)
                 combined_objs[i] = comb
@@ -832,12 +851,17 @@ class SUFI2Engine:
                 if comb > combined_objs[:i].max() if i > 0 else True:
                     best_sims_best = {r: sims_i[r].copy() for r in reach_ids if r in sims_i}
 
+                # Emit NSE for this sample so user sees live scoring
+                nse_str = f"{comb:.4f}" if comb != -np.inf else "-inf (no overlap)"
+                self._emit(
+                    f"    ✓ Sample {i+1} done — NSE: {nse_str}",
+                    pct,
+                )
+
                 # Free simulation memory immediately
                 del sims_i
-                if i % 50 == 49:
+                if i % 20 == 19:
                     gc.collect()
-                    pct = base_pct + (i + 1) / n_samp * (0.80 / n_iter)
-                    self._emit(f"  Iter {it}: {i+1}/{n_samp} …", pct)
 
             gc.collect()
 
