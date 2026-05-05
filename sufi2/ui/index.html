@@ -200,7 +200,7 @@
       <div class="step-circle">3</div><div class="step-label">Validation</div>
     </div>
     <div class="step locked" id="step-forecast"    onclick="goStep('forecast')">
-      <div class="step-circle">4</div><div class="step-label">Hindcast / Forecast</div>
+      <div class="step-circle">4</div><div class="step-label">Hindcast / Forecast <span style="font-size:.68rem;opacity:.6">(optional)</span></div>
     </div>
     <div class="step locked" id="step-results"     onclick="goStep('results')">
       <div class="step-circle">5</div><div class="step-label">Results</div>
@@ -401,7 +401,8 @@
         <tbody id="val-metrics-body"></tbody>
       </table>
       <div class="actions">
-        <button class="btn btn-success" onclick="goStep('forecast')">▶ Run Hindcast / Forecast</button>
+        <button class="btn btn-success" onclick="goStep('results')">📁 View Results</button>
+        <button class="btn btn-secondary" onclick="goStep('forecast')">▶ Hindcast / Forecast <span style="font-size:.75rem;opacity:.7">(optional)</span></button>
       </div>
     </div>
   </div>
@@ -444,6 +445,9 @@
     <div class="actions">
       <button class="btn btn-success" onclick="goStep('results')">📁 View Results</button>
     </div>
+    <p style="font-size:.78rem;color:var(--muted);margin-top:.75rem">
+      ℹ Results are already available from Validation — Hindcast and Forecast are optional extras.
+    </p>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
@@ -794,6 +798,7 @@ async function runValidation(){
     monitorPhase('validation',activeJobId,()=>{
       markStepDone('validation');
       unlockStep('forecast');
+      unlockStep('results');
       showValidationMetrics();
     });
   }catch(e){toast('Error: '+e.message,'error');document.getElementById('val-run-btn').disabled=false}
