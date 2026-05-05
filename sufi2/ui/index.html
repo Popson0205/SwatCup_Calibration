@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>SUFI-2 SWAT Calibration</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;
+      --border:#2e3145;--accent:#4f8ef7;--accent2:#7c5cfc;
+      --success:#22c55e;--warning:#f59e0b;--error:#ef4444;
+      --text:#e2e8f0;--muted:#94a3b8;--radius:10px;
+      --font:'Inter',system-ui,sans-serif;
+    }
+    body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+    .container{width:100%;max-width:940px}
+
+    /* Wake overlay */
+    #wakeOverlay{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem}
+    .wake-bar-wrap{width:220px;background:var(--border);border-radius:999px;height:5px;overflow:hidden}
+    .wake-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px;transition:width .4s}
+
+    /* Header */
+    header{text-align:center;margin-bottom:2rem}
+    header h1{font-size:1.8rem;font-weight:700;letter-spacing:-.5px}
+    header h1 span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    header p{color:var(--muted);margin-top:.4rem;font-size:.9rem}
+
+    /* Phase stepper */
+    .stepper{display:flex;align-items:center;margin-bottom:1.5rem;gap:0;overflow-x:auto;padding-bottom:.25rem}
+    .step{display:flex;flex-direction:column;align-items:center;min-width:120px;cursor:pointer;position:relative}
+    .step:not(:last-child)::after{content:'';position:absolute;top:18px;left:60%;width:80%;height:2px;background:var(--border);z-index:0}
+    .step.done:not(:last-child)::after{background:var(--success)}
+    .step-circle{width:36px;height:36px;border-radius:50%;border:2px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;z-index:1;transition:all .2s}
+    .step.active .step-circle{border-color:var(--accent);background:#1e3a5f;color:var(--accent)}
+    .step.done   .step-circle{border-color:var(--success);background:#14532d;color:var(--success)}
+    .step.locked .step-circle{opacity:.4;cursor:not-allowed}
+    .step-label{font-size:.75rem;color:var(--muted);margin-top:.35rem;text-align:center;font-weight:500}
+    .step.active .step-label{color:var(--text)}
+    .step.done   .step-label{color:var(--success)}
+
+    /* Cards */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;margin-bottom:1.5rem}
+    .card h2{font-size:.85rem;font-weight:600;margin-bottom:1.25rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+    /* Forms */
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    @media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+    .field{display:flex;flex-direction:column;gap:.35rem}
+    label{font-size:.8rem;color:var(--muted);font-weight:500}
+    label span.req{color:var(--error);margin-left:2px}
+    input,select,textarea{background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.9rem;padding:.55rem .75rem;outline:none;transition:border-color .15s;width:100%}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+    textarea{resize:vertical;min-height:70px;font-family:monospace;font-size:.82rem}
+    .hint{font-size:.75rem;color:var(--muted);margin-top:.2rem;line-height:1.5}
+    hr{border:none;border-top:1px solid var(--border);margin:1.25rem 0}
+    kbd{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.1rem .35rem;font-size:.78rem;font-family:monospace}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:.4rem;padding:.65rem 1.4rem;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s}
+    .btn:active{transform:scale(.97)}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+    .btn-secondary{background:var(--border);color:var(--text)}
+    .btn-success{background:#14532d;color:var(--success);border:1px solid var(--success)}
+    .btn-sm{padding:.38rem .85rem;font-size:.8rem}
+    .actions{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.25rem}
+
+    /* Upload */
+    .upload-btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.2rem;background:var(--surface2);border:1px solid var(--accent);border-radius:8px;font-size:.88rem;font-weight:600;color:var(--accent);cursor:pointer;transition:background .15s}
+    .upload-btn:hover{background:#1e3a5f}
+    .upload-btn input[type=file]{display:none}
+
+    /* Scan grid */
+    .scan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.5rem;margin-top:.75rem}
+    .si{border-radius:7px;padding:.6rem .85rem;border:1px solid var(--border)}
+    .si.ok{background:#14532d;border-color:#166534}
+    .si.miss{background:#450a0a;border-color:#7f1d1d}
+    .si.opt{background:#1e2535}
+    .si-row{display:flex;align-items:center;gap:.5rem}
+    .si-lbl{font-family:monospace;font-size:.8rem}
+    .si-det{font-size:.72rem;color:var(--muted);margin-top:.2rem;word-break:break-all}
+
+    /* Parameter table */
+    .param-toolbar{display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap}
+    .param-toolbar input[type=text]{flex:1;min-width:160px;font-size:.82rem;padding:.42rem .7rem}
+    .param-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+    table.params{width:100%;border-collapse:collapse;font-size:.84rem}
+    table.params thead tr{background:var(--surface2)}
+    table.params th{padding:.55rem .75rem;text-align:left;color:var(--muted);font-weight:500;white-space:nowrap}
+    table.params td{padding:.4rem .6rem;border-top:1px solid var(--border);vertical-align:middle}
+    table.params tr:hover td{background:rgba(255,255,255,.02)}
+    table.params input[type=number]{width:90px;padding:.32rem .5rem;font-size:.82rem;-moz-appearance:textfield}
+    table.params input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+    table.params select{width:80px;padding:.32rem .4rem;font-size:.82rem}
+    table.params input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+    .pname{font-family:monospace;font-size:.82rem;color:var(--accent)}
+    .bext{display:inline-block;padding:.1rem .45rem;border-radius:4px;font-size:.72rem;font-weight:600;font-family:monospace}
+    .ext-mgt{background:#1e3a1e;color:#4ade80}.ext-gw{background:#1e2e4a;color:#60a5fa}
+    .ext-sol{background:#3a2a1e;color:#fb923c}.ext-hru{background:#2a1e3a;color:#c084fc}
+    .ext-rte{background:#3a1e2a;color:#f472b6}.ext-bsn{background:#2a3a1e;color:#a3e635}
+
+    /* Monitor */
+    .badge{display:inline-block;padding:.2rem .65rem;border-radius:999px;font-size:.75rem;font-weight:600}
+    .badge-queued{background:#334155;color:var(--muted)}
+    .badge-running{background:#1e3a5f;color:var(--accent)}
+    .badge-done{background:#14532d;color:var(--success)}
+    .badge-error{background:#450a0a;color:var(--error)}
+    .progress-wrap{background:var(--border);border-radius:999px;height:8px;overflow:hidden;margin:.75rem 0}
+    .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px;transition:width .4s}
+    .log-console{background:#0a0c14;border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;color:#a8b4c8;height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+    .log-error{color:var(--error)}.log-ok{color:var(--success)}
+
+    /* Metrics table */
+    table.metrics{width:100%;border-collapse:collapse;font-size:.85rem}
+    table.metrics th{text-align:left;padding:.5rem .75rem;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)}
+    table.metrics td{padding:.55rem .75rem;border-bottom:1px solid var(--border)}
+    table.metrics tr:last-child td{border-bottom:none}
+    .good{color:var(--success)}.warn{color:var(--warning)}.bad{color:var(--error)}
+
+    /* File browser */
+    .file-list{font-size:.82rem;font-family:monospace}
+    .file-folder{color:var(--accent);font-weight:600;margin-top:.75rem;margin-bottom:.25rem}
+    .file-item{display:flex;justify-content:space-between;padding:.2rem .5rem;border-radius:4px}
+    .file-item:hover{background:var(--surface2)}
+    .file-size{color:var(--muted);font-size:.75rem}
+
+    /* Info banner */
+    .info-banner{background:#1e3a5f;border:1px solid #2563eb;border-radius:8px;padding:.9rem 1.1rem;margin-bottom:1rem;font-size:.85rem;color:#93c5fd}
+    .info-banner strong{color:#60a5fa}
+
+    /* Floating log button */
+    #floatLogBtn{
+      position:fixed;bottom:1.5rem;left:1.5rem;z-index:200;
+      background:var(--surface2);border:1px solid var(--border);
+      border-radius:8px;padding:.5rem .9rem;font-size:.78rem;
+      color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:.4rem;
+      transition:border-color .15s,color .15s;
+    }
+    #floatLogBtn:hover{border-color:var(--accent);color:var(--text)}
+    #floatLogBtn.has-error{border-color:var(--error);color:var(--error)}
+
+    /* Log modal */
+    #logModal{
+      position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);
+      display:flex;align-items:center;justify-content:center;
+    }
+    #logModalBox{
+      background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+      width:min(860px,95vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;
+    }
+    #logModalHeader{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:.85rem 1.25rem;border-bottom:1px solid var(--border);
+    }
+    #logModalHeader h3{font-size:.95rem;font-weight:600}
+    #logModalContent{
+      flex:1;overflow-y:auto;padding:1rem 1.25rem;
+      font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;
+      color:#a8b4c8;white-space:pre-wrap;word-break:break-all;background:#0a0c14;
+    }
+    #logModalFooter{
+      display:flex;gap:.75rem;padding:.85rem 1.25rem;
+      border-top:1px solid var(--border);background:var(--surface);
+    }
+
+    /* Toast */
+    #toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem 1.25rem;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+    #toast.show{opacity:1}
+    .hidden{display:none!important}
+  </style>
+</head>
+<body>
+
+<!-- Wake overlay -->
+<div id="wakeOverlay">
+  <div style="font-size:2.5rem">🌊</div>
+  <div style="font-size:1.2rem;font-weight:700">SUFI-2 SWAT Calibration</div>
+  <div style="color:var(--muted);font-size:.88rem" id="wakeMsg">Connecting to server…</div>
+  <div class="wake-bar-wrap"><div class="wake-bar" id="wakeBar" style="width:0%"></div></div>
+  <div style="font-size:.75rem;color:var(--muted)" id="wakeNote"></div>
+</div>
+
+<div class="container">
+  <header>
+    <h1>SUFI-2 <span>SWAT Calibration</span></h1>
+    <p>Multi-reach calibration — sequential workflow: Setup → Calibrate → Validate → Forecast</p>
+  </header>
+
+  <!-- Phase stepper -->
+  <div class="stepper" id="stepper">
+    <div class="step active" id="step-setup"       onclick="goStep('setup')">
+      <div class="step-circle">1</div><div class="step-label">Setup</div>
+    </div>
+    <div class="step locked" id="step-calibration" onclick="goStep('calibration')">
+      <div class="step-circle">2</div><div class="step-label">Calibration</div>
+    </div>
+    <div class="step locked" id="step-validation"  onclick="goStep('validation')">
+      <div class="step-circle">3</div><div class="step-label">Validation</div>
+    </div>
+    <div class="step locked" id="step-forecast"    onclick="goStep('forecast')">
+      <div class="step-circle">4</div><div class="step-label">Hindcast / Forecast</div>
+    </div>
+    <div class="step locked" id="step-results"     onclick="goStep('results')">
+      <div class="step-circle">5</div><div class="step-label">Results</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1 — SETUP                                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="panel-setup">
+
+    <!-- Files -->
+    <div class="card">
+      <h2>SWAT Files (TxtInOut)</h2>
+      <div class="info-banner">
+        <strong>☁️ Running on Render?</strong>
+        Your local Windows/Mac paths are not visible to the server.
+        Use <strong>Upload Files</strong> below.
+      </div>
+      <div class="field" style="margin-bottom:1.25rem">
+        <label>Upload TxtInOut Files <span class="req">*</span></label>
+        <label class="upload-btn" style="width:fit-content">
+          📁 Select files from TxtInOut folder
+          <input type="file" id="swatFileUpload" multiple
+            accept=".csv,.rch,.cio,.mgt,.gw,.sol,.hru,.rte,.bsn,.txt,.exe"
+            onchange="handleFileUpload(this)"/>
+        </label>
+        <span class="hint">
+          Open your <code>TxtInOut</code> folder → select all files (<kbd>Ctrl+A</kbd>) → Open.<br/>
+          Required: <code>output.rch</code>, <code>file.cio</code>,
+          one or more <code>observed_flow_rchN.csv</code> (one per reach),
+          plus <code>*.mgt .gw .sol .hru .rte .bsn</code>.
+        </span>
+      </div>
+      <div id="uploadScan" class="hidden">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+          <span id="uploadScanIcon" style="font-size:1.3rem">📂</span>
+          <span id="uploadScanText" style="font-size:.9rem;font-weight:600"></span>
+        </div>
+        <div class="scan-grid" id="uploadScanGrid"></div>
+        <div id="uploadScanMsgs" style="margin-top:.6rem;font-size:.8rem"></div>
+      </div>
+      <div id="uploadedFileList" style="margin-top:.75rem;font-size:.78rem;color:var(--muted)"></div>
+      <hr/>
+      <details>
+        <summary style="cursor:pointer;font-size:.82rem;color:var(--muted);user-select:none;padding:.25rem 0">
+          ⚙ Running locally or on Docker? Use a server-side path instead
+        </summary>
+        <div style="margin-top:.85rem" class="field">
+          <label>Server-side TxtInOut Path</label>
+          <div style="display:flex;gap:.5rem">
+            <input type="text" id="work_dir" placeholder="/data/TxtInOut"/>
+            <button class="btn btn-secondary btn-sm" onclick="scanServerDir()">🔍 Scan</button>
+          </div>
+          <span class="hint">Windows paths like <code>C:\Users\...</code> will not work here.</span>
+          <div id="serverScan" class="hidden" style="margin-top:.75rem">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+              <span id="serverScanIcon" style="font-size:1.3rem">⏳</span>
+              <span id="serverScanText" style="font-size:.9rem;font-weight:600"></span>
+            </div>
+            <div class="scan-grid" id="serverScanGrid"></div>
+            <div id="serverScanMsgs" style="margin-top:.6rem;font-size:.8rem"></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Calibration config -->
+    <div class="card">
+      <h2>Calibration Settings</h2>
+      <div class="form-grid">
+        <div class="field"><label>Iterations</label><input type="number" id="iterations" placeholder="e.g. 3" min="1" max="50"/></div>
+        <div class="field"><label>Samples per Iteration</label><input type="number" id="n_samples" placeholder="e.g. 500" min="10" max="5000"/></div>
+        <div class="field">
+          <label>Objective Function</label>
+          <select id="obj_func">
+            <option value="NSE" selected>NSE — Nash-Sutcliffe Efficiency</option>
+            <option value="KGE">KGE — Kling-Gupta Efficiency</option>
+            <option value="R2">R² — Coefficient of Determination</option>
+          </select>
+        </div>
+        <div class="field"><label>Top Fraction</label><input type="number" id="top_fraction" placeholder="e.g. 0.10" min="0.01" max="0.99" step="0.01"/><span class="hint">Fraction of best runs used to narrow parameter ranges</span></div>
+        <div class="field"><label>Warm-up Years</label><input type="number" id="warmup_years" placeholder="e.g. 3" min="0" max="10"/></div>
+        <div class="field"><label>Random Seed</label><input type="number" id="seed" placeholder="e.g. 42"/></div>
+      </div>
+    </div>
+
+    <!-- Periods -->
+    <div class="card">
+      <h2>Simulation Periods</h2>
+      <div class="form-grid">
+        <div class="field"><label>Calibration Start <span class="req">*</span></label><input type="date" id="calib_start"/></div>
+        <div class="field"><label>Calibration End <span class="req">*</span></label><input type="date" id="calib_end"/></div>
+        <div class="field"><label>Validation Start <span class="req">*</span></label><input type="date" id="valid_start"/></div>
+        <div class="field"><label>Validation End <span class="req">*</span></label><input type="date" id="valid_end"/></div>
+        <div class="field"><label>Hindcast Start <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="date" id="hind_start"/></div>
+        <div class="field"><label>Hindcast End</label><input type="date" id="hind_end"/></div>
+        <div class="field"><label>Forecast Start <span style="color:var(--muted);font-weight:400">(optional)</span></label><input type="date" id="fore_start"/></div>
+        <div class="field"><label>Forecast End</label><input type="date" id="fore_end"/></div>
+      </div>
+    </div>
+
+    <!-- Reaches -->
+    <div class="card">
+      <h2>Reaches & Weights</h2>
+      <div class="field" style="margin-bottom:1rem">
+        <label>Reach IDs <span style="color:var(--muted);font-weight:400">(optional — auto-detected from uploaded files)</span></label>
+        <input type="text" id="reach_ids" placeholder="e.g. 13,15,16,17"/>
+      </div>
+      <div class="field">
+        <label>Reach Weights <span style="color:var(--muted);font-weight:400">(optional JSON — must sum to 1.0)</span></label>
+        <textarea id="reach_weights" placeholder='{"13": 0.25, "15": 0.25, "16": 0.25, "17": 0.25}'></textarea>
+        <span class="hint">Leave blank for equal weights.</span>
+      </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="card">
+      <h2>Parameters to Calibrate</h2>
+      <div class="param-toolbar">
+        <input type="text" id="paramSearch" placeholder="🔍 Filter…" oninput="filterParams()"/>
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(true)">All</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(false)">None</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetRanges()">Reset Ranges</button>
+        <span style="font-size:.8rem;color:var(--muted);margin-left:auto" id="selCount">0 selected</span>
+      </div>
+      <div class="param-table-wrap">
+        <table class="params">
+          <thead><tr>
+            <th style="width:36px"><input type="checkbox" id="checkAll" onchange="toggleAll(this)"/></th>
+            <th>Parameter</th><th>File</th><th>Min</th><th>Max</th><th>Change</th><th>Description</th>
+          </tr></thead>
+          <tbody id="paramBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:1.5rem">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:.75rem;font-size:.78rem;color:var(--muted)">
+        <strong style="color:var(--text)">Change types:</strong>
+        <code style="color:var(--accent)">v</code> = replace &nbsp;|&nbsp;
+        <code style="color:var(--accent)">r</code> = relative: orig × (1+val) &nbsp;|&nbsp;
+        <code style="color:var(--accent)">a</code> = additive: orig + val
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="downloadConfig()">⬇ config.yaml</button>
+      <button class="btn btn-secondary" onclick="downloadParInf()">⬇ par_inf.txt</button>
+      <button class="btn btn-primary" onclick="startCalibration()">▶ Start Calibration</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2 — CALIBRATION                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="panel-calibration" class="hidden">
+    <div class="card">
+      <h2>Calibration Progress</h2>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <span style="font-family:monospace;color:var(--accent)" id="calib-jobId">—</span>
+        <span class="badge badge-queued" id="calib-badge">queued</span>
+        <span style="color:var(--muted);font-size:.85rem" id="calib-pct">0%</span>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="calib-bar" style="width:0%"></div></div>
+      <div class="log-console" id="calib-log">Waiting for logs…</div>
+    </div>
+    <div class="card hidden" id="calib-summary">
+      <h2>Calibration Summary</h2>
+      <div id="calib-summary-body"></div>
+      <div class="actions">
+        <button class="btn btn-success" onclick="goStep('validation')">▶ Run Validation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3 — VALIDATION                                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="panel-validation" class="hidden">
+    <div class="card">
+      <h2>Validation</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">
+        Applies the best calibrated parameter set to the validation period
+        (<span id="val-period">—</span>) and scores each reach.
+      </p>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <span class="badge badge-queued" id="val-badge">ready</span>
+        <span style="color:var(--muted);font-size:.85rem" id="val-pct"></span>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="val-bar" style="width:0%"></div></div>
+      <div class="log-console" id="val-log" style="height:180px">Click "Run Validation" to start…</div>
+      <div class="actions">
+        <button class="btn btn-primary" id="val-run-btn" onclick="runValidation()">▶ Run Validation</button>
+      </div>
+    </div>
+    <div class="card hidden" id="val-results">
+      <h2>Validation Metrics</h2>
+      <table class="metrics" id="val-metrics-table">
+        <thead><tr><th>Reach</th><th>NSE</th><th>KGE</th><th>R²</th><th>PBIAS (%)</th></tr></thead>
+        <tbody id="val-metrics-body"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn btn-success" onclick="goStep('forecast')">▶ Run Hindcast / Forecast</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4 — HINDCAST / FORECAST                                          -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="panel-forecast" class="hidden">
+    <div class="form-grid" style="margin-bottom:1.5rem">
+
+      <!-- Hindcast card -->
+      <div class="card" style="margin-bottom:0">
+        <h2>Hindcast</h2>
+        <p style="color:var(--muted);font-size:.83rem;margin-bottom:1rem">
+          Simulation only — no observed data required. Period: <strong id="hind-period">—</strong>
+        </p>
+        <div class="progress-wrap"><div class="progress-bar" id="hind-bar" style="width:0%"></div></div>
+        <div class="log-console" id="hind-log" style="height:140px">Click "Run Hindcast" to start…</div>
+        <div class="actions">
+          <button class="btn btn-primary" id="hind-run-btn" onclick="runHindcast()">▶ Run Hindcast</button>
+        </div>
+        <div id="hind-stats" class="hidden" style="margin-top:1rem;font-size:.83rem"></div>
+      </div>
+
+      <!-- Forecast card -->
+      <div class="card" style="margin-bottom:0">
+        <h2>Forecast</h2>
+        <p style="color:var(--muted);font-size:.83rem;margin-bottom:1rem">
+          Simulation only — no observed data required. Period: <strong id="fore-period">—</strong>
+        </p>
+        <div class="progress-wrap"><div class="progress-bar" id="fore-bar" style="width:0%"></div></div>
+        <div class="log-console" id="fore-log" style="height:140px">Click "Run Forecast" to start…</div>
+        <div class="actions">
+          <button class="btn btn-primary" id="fore-run-btn" onclick="runForecast()">▶ Run Forecast</button>
+        </div>
+        <div id="fore-stats" class="hidden" style="margin-top:1rem;font-size:.83rem"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-success" onclick="goStep('results')">📁 View Results</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5 — RESULTS                                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="panel-results" class="hidden">
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center">
+        Output Files
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary btn-sm" onclick="loadResultFiles()">↻ Refresh</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadResults()">⬇ Download All (ZIP)</button>
+        </div>
+      </h2>
+      <div id="fileList" class="file-list">
+        <div style="color:var(--muted);padding:1rem">Click Refresh to load file list.</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Output Folder Structure</h2>
+      <pre style="font-size:.8rem;color:var(--muted);line-height:1.7">sufi2_results/
+├── best_parameters.csv
+├── calibration/
+│   ├── convergence.png
+│   └── iteration_N/
+│       ├── parameter_sets.csv
+│       ├── sensitivity_combined.csv
+│       ├── ppu_band_rchN.csv
+│       ├── dotty_*.png
+│       ├── 95ppu_rchN.png
+│       └── sensitivity_*.png
+├── validation/
+│   ├── validation_metrics.csv
+│   ├── validation_flow_rchN.csv
+│   └── validation_rchN.png
+├── hindcast/
+│   └── hindcast_flow_rchN.csv
+└── forecast/
+    └── forecast_flow_rchN.csv</pre>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- Floating log button -->
+<div id="floatLogBtn" onclick="openLogModal()" title="View error log">
+  📋 <span id="floatLogLabel">Logs</span>
+</div>
+
+<!-- Log modal -->
+<div id="logModal" class="hidden" onclick="if(event.target===this)closeLogModal()">
+  <div id="logModalBox">
+    <div id="logModalHeader">
+      <h3>Session Log</h3>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-secondary btn-sm" onclick="copyLog()">📋 Copy All</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearLog()">🗑 Clear</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeLogModal()">✕ Close</button>
+      </div>
+    </div>
+    <div id="logModalContent">No logs yet. Start a calibration run to see logs here.</div>
+    <div id="logModalFooter">
+      <span style="font-size:.78rem;color:var(--muted)" id="logModalMeta">—</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════════════
+// State
+// ════════════════════════════════════════════════════════════════════════════
+let allParams     = [];
+let uploadedFiles = [];
+let activeJobId   = null;
+let sseSource     = null;
+let pollTimer     = null;
+let currentStep   = 'setup';
+let stepsUnlocked = new Set(['setup']);
+
+const PARAM_DESCS = {
+  'CN2.mgt':'Curve Number — surface runoff','ALPHA_BF.gw':'Baseflow recession constant',
+  'GW_DELAY.gw':'Groundwater delay (days)','GWQMN.gw':'Threshold depth for return flow (mm)',
+  'GW_REVAP.gw':'Revap coefficient','REVAPMN.gw':'Threshold depth for revap (mm)',
+  'SOL_AWC.sol':'Available water capacity','SOL_K.sol':'Saturated hydraulic conductivity',
+  'SOL_BD.sol':'Moist bulk density','ESCO.hru':'Soil evaporation compensation factor',
+  'EPCO.hru':'Plant uptake compensation factor','CH_N2.rte':"Manning's n for main channel",
+  'CH_K2.rte':'Effective hydraulic conductivity of channel','SURLAG.bsn':'Surface runoff lag',
+  'SMFMX.bsn':'Max melt rate for snow','SPCON.bsn':'Max re-entrained sediment',
+  'SPEXP.bsn':'Channel re-entrainment exponent','CH_EROD.rte':'Channel erodibility factor',
+  'CH_COV.rte':'Channel cover factor','USLE_P.mgt':'USLE support practice factor',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wake-up overlay
+// ════════════════════════════════════════════════════════════════════════════
+async function waitForServer(maxMs=90000){
+  const overlay=document.getElementById('wakeOverlay');
+  const msg=document.getElementById('wakeMsg');
+  const bar=document.getElementById('wakeBar');
+  const note=document.getElementById('wakeNote');
+  const start=Date.now(); let attempt=0;
+  while(Date.now()-start<maxMs){
+    attempt++;
+    const elapsed=Date.now()-start;
+    bar.style.width=Math.min((elapsed/maxMs)*100,95)+'%';
+    if(elapsed>5000){msg.textContent='Server waking up (~30s on free tier)…';note.textContent=`Attempt ${attempt} · ${Math.round(elapsed/1000)}s`}
+    try{const r=await fetch('/health',{signal:AbortSignal.timeout(4000)});if(r.ok){bar.style.width='100%';msg.textContent='Connected ✓';await new Promise(r=>setTimeout(r,300));overlay.style.transition='opacity .4s';overlay.style.opacity='0';await new Promise(r=>setTimeout(r,400));overlay.style.display='none';return true}}catch{}
+    await new Promise(r=>setTimeout(r,2000));
+  }
+  msg.textContent='Server not responding after 90s.';bar.style.background='var(--error)';return false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Stepper
+// ════════════════════════════════════════════════════════════════════════════
+const STEPS = ['setup','calibration','validation','forecast','results'];
+
+function goStep(id){
+  if(!stepsUnlocked.has(id)){toast('Complete the previous step first','error');return}
+  currentStep=id;
+  STEPS.forEach(s=>{
+    document.getElementById(`panel-${s}`).classList.toggle('hidden', s!==id);
+    const el=document.getElementById(`step-${s}`);
+    el.classList.remove('active','locked');
+    if(s===id) el.classList.add('active');
+    else if(!stepsUnlocked.has(s)) el.classList.add('locked');
+  });
+  if(id==='results') loadResultFiles();
+}
+
+function unlockStep(id){
+  stepsUnlocked.add(id);
+  const el=document.getElementById(`step-${id}`);
+  if(el) el.classList.remove('locked');
+}
+
+function markStepDone(id){
+  const el=document.getElementById(`step-${id}`);
+  if(el) el.classList.add('done');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// File upload + client-side scan
+// ════════════════════════════════════════════════════════════════════════════
+function handleFileUpload(input){
+  uploadedFiles=Array.from(input.files);
+  const list=document.getElementById('uploadedFileList');
+  if(!uploadedFiles.length){list.innerHTML='';document.getElementById('uploadScan').classList.add('hidden');return}
+  list.innerHTML=uploadedFiles.map(f=>`<span style="display:inline-block;margin:.15rem .3rem;padding:.1rem .5rem;background:var(--surface2);border-radius:4px;font-family:monospace;font-size:.75rem">${f.name}</span>`).join('');
+  scanUploadedFiles(uploadedFiles);
+  toast(`${uploadedFiles.length} file(s) staged`,'ok');
+}
+
+function scanUploadedFiles(files){
+  const names=files.map(f=>f.name.toLowerCase());
+  const panel=document.getElementById('uploadScan');
+  const icon=document.getElementById('uploadScanIcon');
+  const text=document.getElementById('uploadScanText');
+  const grid=document.getElementById('uploadScanGrid');
+  const msgs=document.getElementById('uploadScanMsgs');
+  panel.classList.remove('hidden');
+
+  const obsFiles=files.filter(f=>/^(observed_flow|obs_flow)_rch\d+\.csv$/i.test(f.name));
+  const obsCount=obsFiles.length;
+
+  const checks=[
+    {key:'output_rch', label:'output.rch',           found:names.includes('output.rch'), required:true},
+    {key:'obs_flow',   label:'observed_flow_rchN.csv',found:obsCount>0,                  required:true,
+     detail:obsCount>0?`${obsCount} reach(es): ${obsFiles.map(f=>f.name).join(', ')}`:null},
+    {key:'file_cio',   label:'file.cio',              found:names.includes('file.cio'),   required:false},
+    {key:'mgt',        label:'*.mgt',                 found:names.some(n=>n.endsWith('.mgt')), required:false,
+     detail:names.filter(n=>n.endsWith('.mgt')).length?`${names.filter(n=>n.endsWith('.mgt')).length} file(s)`:null},
+    {key:'gw',         label:'*.gw',                  found:names.some(n=>n.endsWith('.gw')),  required:false},
+    {key:'sol',        label:'*.sol',                 found:names.some(n=>n.endsWith('.sol')), required:false},
+    {key:'hru',        label:'*.hru',                 found:names.some(n=>n.endsWith('.hru')), required:false},
+    {key:'rte',        label:'*.rte',                 found:names.some(n=>n.endsWith('.rte')), required:false},
+    {key:'bsn',        label:'*.bsn',                 found:names.some(n=>n.endsWith('.bsn')), required:false},
+    {key:'par_inf',    label:'par_inf.txt',           found:names.includes('par_inf.txt'), required:false, note:'built-in defaults used'},
+    {key:'swat_exe',   label:'swat_exe',              found:names.some(n=>n.startsWith('swat')&&!n.endsWith('.csv')), required:false, note:'mock runner used'},
+  ];
+
+  const errors=checks.filter(c=>c.required&&!c.found);
+  const ready=errors.length===0;
+  icon.textContent=ready?'✅':'⚠️';
+  text.innerHTML=ready
+    ?`<span style="color:var(--success)">Ready — ${files.length} files, ${obsCount} reach(es) detected</span>`
+    :`<span style="color:var(--warning)">${errors.length} required file(s) missing</span>`;
+
+  grid.innerHTML=checks.map(c=>{
+    const cls=c.found?'ok':c.required?'miss':'opt';
+    const col=c.found?'var(--success)':c.required?'var(--error)':'var(--muted)';
+    const ico=c.found?'✓':c.required?'✗':'–';
+    const det=c.detail||(!c.found&&c.note?c.note:'');
+    return `<div class="si ${cls}"><div class="si-row"><span style="color:${col};font-weight:700">${ico}</span><span class="si-lbl">${c.label}</span>${!c.required?'<span style="font-size:.7rem;color:var(--muted)">(opt)</span>':''}</div>${det?`<div class="si-det">${det}</div>`:''}</div>`;
+  }).join('');
+
+  msgs.innerHTML=errors.map(e=>`<div style="color:var(--error);margin:.2rem 0">✗ <strong>${e.label}</strong> not found</div>`).join('');
+}
+
+async function scanServerDir(){
+  const path=document.getElementById('work_dir').value.trim()||'.';
+  const panel=document.getElementById('serverScan');
+  const icon=document.getElementById('serverScanIcon');
+  const text=document.getElementById('serverScanText');
+  const grid=document.getElementById('serverScanGrid');
+  const msgs=document.getElementById('serverScanMsgs');
+  panel.classList.remove('hidden');
+  icon.textContent='⏳';text.textContent=`Scanning ${path}…`;grid.innerHTML='';msgs.innerHTML='';
+  try{
+    const data=await(await fetch(`/scan?path=${encodeURIComponent(path)}`)).json();
+    if(!data.exists){icon.textContent='❌';text.innerHTML=`<span style="color:var(--error)">Not found: ${data.path}</span>`;msgs.innerHTML='<div style="color:var(--muted);margin-top:.5rem">Windows paths are not accessible from the server. Use Upload instead.</div>';return}
+    icon.textContent=data.ready?'✅':'⚠️';
+    text.innerHTML=data.ready?`<span style="color:var(--success)">Ready — ${data.path}</span>`:`<span style="color:var(--warning)">Issues — ${data.path}</span>`;
+    const META={file_cio:{label:'file.cio',req:false},output_rch:{label:'output.rch',req:true},observed_flow:{label:'observed_flow_rchN.csv',req:true},mgt:{label:'*.mgt',req:false},gw:{label:'*.gw',req:false},sol:{label:'*.sol',req:false},hru:{label:'*.hru',req:false},rte:{label:'*.rte',req:false},bsn:{label:'*.bsn',req:false},par_inf:{label:'par_inf.txt',req:false},swat_exe:{label:'swat_exe',req:false}};
+    grid.innerHTML=Object.entries(META).map(([k,m])=>{const f=data.files[k]||{};const cls=f.found?'ok':m.req?'miss':'opt';const col=f.found?'var(--success)':m.req?'var(--error)':'var(--muted)';const ico=f.found?'✓':m.req?'✗':'–';let det='';if(k==='observed_flow'&&f.found)det=`${f.count} reach(es): ${(f.names||[]).join(', ')}`;else if(f.found&&f.name)det=f.name;else if(!f.found&&f.note)det=f.note;return`<div class="si ${cls}"><div class="si-row"><span style="color:${col};font-weight:700">${ico}</span><span class="si-lbl">${m.label}</span>${!m.req?'<span style="font-size:.7rem;color:var(--muted)">(opt)</span>':''}</div>${det?`<div class="si-det">${det}</div>`:''}</div>`}).join('');
+    msgs.innerHTML=[...data.errors.map(e=>`<div style="color:var(--error);margin:.2rem 0">✗ ${e}</div>`),...data.warnings.map(w=>`<div style="color:var(--warning);margin:.2rem 0">⚠ ${w}</div>`)].join('');
+  }catch(e){icon.textContent='❌';text.textContent='Scan failed: '+e.message}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Parameters
+// ════════════════════════════════════════════════════════════════════════════
+async function loadParams(){
+  try{
+    const data=await(await fetch('/parameters')).json();
+    allParams=data.parameters.map(p=>({...p,selected:true,_origMin:p.min,_origMax:p.max}));
+    renderParamTable();updateSelCount();
+  }catch(e){document.getElementById('paramBody').innerHTML='<tr><td colspan="7" style="color:var(--error);text-align:center;padding:1rem">Failed to load parameters</td></tr>'}
+}
+
+function renderParamTable(filter=''){
+  const q=filter.toLowerCase();
+  const visible=allParams.filter(p=>!q||p.name.toLowerCase().includes(q));
+  const tbody=document.getElementById('paramBody');
+  if(!visible.length){tbody.innerHTML='<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:1rem">No match</td></tr>';return}
+  tbody.innerHTML=visible.map(p=>{
+    const gi=allParams.indexOf(p);const ext=p.name.split('.')[1]||'';
+    return`<tr><td><input type="checkbox" ${p.selected?'checked':''} onchange="toggleParam(${gi},this.checked)"/></td><td><span class="pname">${p.name.split('.')[0]}</span></td><td><span class="bext ext-${ext}">.${ext}</span></td><td><input type="number" step="any" value="${p.min}" oninput="updateParam(${gi},'min',this.value)" style="${!p.selected?'opacity:.4':''}"/></td><td><input type="number" step="any" value="${p.max}" oninput="updateParam(${gi},'max',this.value)" style="${!p.selected?'opacity:.4':''}"/></td><td><select onchange="updateParam(${gi},'change_type',this.value)" style="${!p.selected?'opacity:.4':''}"><option value="v" ${p.change_type==='v'?'selected':''}>v</option><option value="r" ${p.change_type==='r'?'selected':''}>r</option><option value="a" ${p.change_type==='a'?'selected':''}>a</option></select></td><td style="font-size:.75rem;color:var(--muted)">${PARAM_DESCS[p.name]||''}</td></tr>`;
+  }).join('');
+}
+function updateParam(idx,field,val){allParams[idx][field]=(field==='min'||field==='max')?parseFloat(val):val}
+function toggleParam(idx,checked){allParams[idx].selected=checked;updateSelCount();renderParamTable(document.getElementById('paramSearch').value)}
+function filterParams(){renderParamTable(document.getElementById('paramSearch').value)}
+function selectAll(state){allParams.forEach(p=>p.selected=state);updateSelCount();renderParamTable(document.getElementById('paramSearch').value);document.getElementById('checkAll').checked=state}
+function toggleAll(cb){selectAll(cb.checked)}
+function resetRanges(){allParams.forEach(p=>{p.min=p._origMin;p.max=p._origMax});renderParamTable(document.getElementById('paramSearch').value);toast('Ranges reset','info')}
+function updateSelCount(){const n=allParams.filter(p=>p.selected).length;document.getElementById('selCount').textContent=`${n} / ${allParams.length} selected`}
+function getSelectedParams(){return allParams.filter(p=>p.selected).map(p=>({name:p.name,min:p.min,max:p.max,change_type:p.change_type}))}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Build config
+// ════════════════════════════════════════════════════════════════════════════
+function buildConfig(){
+  const rw=document.getElementById('reach_weights').value.trim();
+  let reach_weights=null;
+  if(rw){try{reach_weights=JSON.parse(rw)}catch{toast('Invalid reach_weights JSON','error');return null}}
+  const hs=document.getElementById('hind_start').value,he=document.getElementById('hind_end').value;
+  const fs=document.getElementById('fore_start').value,fe=document.getElementById('fore_end').value;
+  const periods={
+    calibration:{start:document.getElementById('calib_start').value,end:document.getElementById('calib_end').value},
+    validation: {start:document.getElementById('valid_start').value,end:document.getElementById('valid_end').value},
+  };
+  if(hs&&he)periods.hindcast={start:hs,end:he};
+  if(fs&&fe)periods.forecast={start:fs,end:fe};
+  const swat_exe=document.getElementById('swat_exe')?.value?.trim()||'';
+  const reach_raw=document.getElementById('reach_ids').value.trim();
+  return{
+    paths:{work_dir:document.getElementById('work_dir').value.trim()||'',results_dir:'sufi2_results',swat_exe:swat_exe||null,par_inf:null},
+    calibration:{iterations:parseInt(document.getElementById('iterations').value),n_samples:parseInt(document.getElementById('n_samples').value),obj_func:document.getElementById('obj_func').value,top_fraction:parseFloat(document.getElementById('top_fraction').value),warmup_years:parseInt(document.getElementById('warmup_years').value),seed:parseInt(document.getElementById('seed').value),reach_weights},
+    periods,
+    reach_ids:reach_raw?reach_raw.split(',').map(x=>parseInt(x.trim())).filter(Boolean):null,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase runners
+// ════════════════════════════════════════════════════════════════════════════
+async function startCalibration(){
+  if(allParams.length===0)await loadParams();
+
+  // Validate required fields
+  const required = [
+    ['iterations',  'Iterations'],
+    ['n_samples',   'Samples per Iteration'],
+    ['top_fraction','Top Fraction'],
+    ['warmup_years','Warm-up Years'],
+    ['seed',        'Random Seed'],
+    ['calib_start', 'Calibration Start'],
+    ['calib_end',   'Calibration End'],
+    ['valid_start', 'Validation Start'],
+    ['valid_end',   'Validation End'],
+  ];
+  for(const [id, label] of required){
+    const el = document.getElementById(id);
+    if(!el || el.value.trim() === ''){
+      toast(`${label} is required`, 'error');
+      el && el.focus();
+      return;
+    }
+  }
+
+  const cfg=buildConfig();if(!cfg)return;
+  const selParams=getSelectedParams();
+  if(!selParams.length){toast('Select at least one parameter','error');return}
+  const workDirVal = document.getElementById('work_dir').value.trim();
+  if(!uploadedFiles.length && !workDirVal)
+    {toast('Upload your TxtInOut files or enter a server path','error');return}
+
+  const fd=new FormData();
+  fd.append('config_json',JSON.stringify({...cfg,_selected_params:selParams}));
+  for(const f of uploadedFiles)fd.append('data_files',f,f.name);
+
+  try{
+    const res=await fetch('/jobs/calibrate',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Submission failed','error');return}
+    activeJobId=data.job_id;
+
+    // Update validation period display
+    document.getElementById('val-period').textContent=`${cfg.periods.validation.start} → ${cfg.periods.validation.end}`;
+    document.getElementById('hind-period').textContent=cfg.periods.hindcast?`${cfg.periods.hindcast.start} → ${cfg.periods.hindcast.end}`:'Not configured';
+    document.getElementById('fore-period').textContent=cfg.periods.forecast?`${cfg.periods.forecast.start} → ${cfg.periods.forecast.end}`:'Not configured';
+
+    unlockStep('calibration');
+    goStep('calibration');
+    document.getElementById('calib-jobId').textContent=activeJobId;
+    monitorPhase('calibration',activeJobId,()=>{
+      markStepDone('calibration');
+      unlockStep('validation');
+      document.getElementById('calib-summary').classList.remove('hidden');
+      document.getElementById('calib-summary-body').innerHTML=`<p style="color:var(--muted);font-size:.85rem">Calibration complete. Job ID: <code>${activeJobId}</code>. Best parameters saved to <code>sufi2_results/best_parameters.csv</code>.</p>`;
+    });
+    toast(`Job ${activeJobId} started`,'ok');
+  }catch(e){toast('Network error: '+e.message,'error')}
+}
+
+async function runValidation(){
+  if(!activeJobId){toast('No active job','error');return}
+  document.getElementById('val-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/validate`,{method:'POST'});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Failed','error');document.getElementById('val-run-btn').disabled=false;return}
+    monitorPhase('validation',activeJobId,()=>{
+      markStepDone('validation');
+      unlockStep('forecast');
+      showValidationMetrics();
+    });
+  }catch(e){toast('Error: '+e.message,'error');document.getElementById('val-run-btn').disabled=false}
+}
+
+async function runHindcast(){
+  if(!activeJobId){toast('No active job','error');return}
+  document.getElementById('hind-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/hindcast`,{method:'POST'});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Failed','error');document.getElementById('hind-run-btn').disabled=false;return}
+    monitorPhase('hindcast',activeJobId,()=>{
+      markStepDone('forecast');
+      showPeriodStats('hindcast');
+    });
+  }catch(e){toast('Error: '+e.message,'error');document.getElementById('hind-run-btn').disabled=false}
+}
+
+async function runForecast(){
+  if(!activeJobId){toast('No active job','error');return}
+  document.getElementById('fore-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/forecast`,{method:'POST'});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Failed','error');document.getElementById('fore-run-btn').disabled=false;return}
+    monitorPhase('forecast',activeJobId,()=>{
+      showPeriodStats('forecast');
+    });
+  }catch(e){toast('Error: '+e.message,'error');document.getElementById('fore-run-btn').disabled=false}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase monitor
+// ════════════════════════════════════════════════════════════════════════════
+const PHASE_ELS = {
+  calibration:{ bar:'calib-bar', badge:'calib-badge', pct:'calib-pct', log:'calib-log' },
+  validation: { bar:'val-bar',   badge:'val-badge',   pct:'val-pct',   log:'val-log'   },
+  hindcast:   { bar:'hind-bar',  badge:null,          pct:null,        log:'hind-log'  },
+  forecast:   { bar:'fore-bar',  badge:null,          pct:null,        log:'fore-log'  },
+};
+
+function monitorPhase(phase, jobId, onDone){
+  const els=PHASE_ELS[phase];
+  if(!els)return;
+
+  // SSE for logs
+  if(sseSource)sseSource.close();
+  const logEl=document.getElementById(els.log);
+  logEl.textContent='';
+  sseSource=new EventSource(`/jobs/${jobId}/logs`);
+  sseSource.onmessage=e=>{
+    const d=document.createElement('div');
+    d.textContent=e.data;
+    if(e.data.includes('ERROR'))d.className='log-error';
+    if(e.data.includes('✓')||e.data.includes('complete'))d.className='log-ok';
+    logEl.appendChild(d);logEl.scrollTop=logEl.scrollHeight;
+    // Also feed the floating log store
+    appendSessionLog(e.data);
+    if(e.data.startsWith('[STREAM END'))sseSource.close();
+  };
+  sseSource.onerror=()=>sseSource.close();
+
+  // Poll status
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    try{
+      const data=await(await fetch(`/jobs/${jobId}/status`)).json();
+      const pct=data.progress||0;
+      if(els.bar)document.getElementById(els.bar).style.width=pct+'%';
+      if(els.pct)document.getElementById(els.pct).textContent=pct.toFixed(1)+'%';
+      if(els.badge){const b=document.getElementById(els.badge);b.textContent=data.status;b.className=`badge badge-${data.status}`}
+      if(data.status==='done'){
+        clearInterval(pollTimer);
+        toast(`${phase} complete ✓`,'ok');
+        if(onDone)onDone(data.result);
+      }else if(data.status==='error'){
+        clearInterval(pollTimer);
+        toast(`${phase} failed: ${data.error||'unknown'}`,'error');
+      }
+    }catch{}
+  },2000);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Results display
+// ════════════════════════════════════════════════════════════════════════════
+async function showValidationMetrics(){
+  document.getElementById('val-results').classList.remove('hidden');
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/status`)).json();
+    const metrics=data.result?.metrics||{};
+    const tbody=document.getElementById('val-metrics-body');
+    if(!Object.keys(metrics).length){tbody.innerHTML='<tr><td colspan="5" style="color:var(--muted)">No metrics available</td></tr>';return}
+    function scoreClass(v,good,ok){return v>=good?'good':v>=ok?'warn':'bad'}
+    tbody.innerHTML=Object.entries(metrics).map(([rid,m])=>`
+      <tr>
+        <td><strong>Reach ${rid}</strong></td>
+        <td class="${scoreClass(m.NSE,.65,.5)}">${m.NSE.toFixed(3)}</td>
+        <td class="${scoreClass(m.KGE,.65,.5)}">${m.KGE.toFixed(3)}</td>
+        <td class="${scoreClass(m.R2,.65,.5)}">${m.R2.toFixed(3)}</td>
+        <td class="${Math.abs(m.PBIAS)<10?'good':Math.abs(m.PBIAS)<25?'warn':'bad'}">${m.PBIAS.toFixed(1)}</td>
+      </tr>`).join('');
+  }catch(e){console.error(e)}
+}
+
+async function showPeriodStats(phase){
+  const statsEl=document.getElementById(`${phase==='hindcast'?'hind':'fore'}-stats`);
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/status`)).json();
+    const stats=data.result?.reach_stats||{};
+    if(!Object.keys(stats).length){statsEl.innerHTML='<p style="color:var(--muted)">No output in this period.</p>';statsEl.classList.remove('hidden');return}
+    statsEl.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><thead><tr style="color:var(--muted)"><th style="padding:.35rem .5rem;text-align:left">Reach</th><th>Months</th><th>Mean (m³/s)</th><th>Min</th><th>Max</th></tr></thead><tbody>'+
+      Object.entries(stats).map(([rid,s])=>`<tr style="border-top:1px solid var(--border)"><td style="padding:.35rem .5rem"><strong>${rid}</strong></td><td style="padding:.35rem .5rem">${s.n_months}</td><td style="padding:.35rem .5rem">${s.mean.toFixed(3)}</td><td style="padding:.35rem .5rem">${s.min.toFixed(3)}</td><td style="padding:.35rem .5rem">${s.max.toFixed(3)}</td></tr>`).join('')+
+      '</tbody></table>';
+    statsEl.classList.remove('hidden');
+  }catch(e){console.error(e)}
+}
+
+async function loadResultFiles(){
+  if(!activeJobId){document.getElementById('fileList').innerHTML='<div style="color:var(--muted);padding:1rem">No active job.</div>';return}
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/files`)).json();
+    const files=data.files||[];
+    if(!files.length){document.getElementById('fileList').innerHTML='<div style="color:var(--muted);padding:1rem">No files yet.</div>';return}
+
+    // Group by folder
+    const groups={};
+    for(const f of files){
+      const folder=f.path.split('/')[0];
+      if(!groups[folder])groups[folder]=[];
+      groups[folder].push(f);
+    }
+
+    let html='';
+    for(const[folder,items]of Object.entries(groups)){
+      html+=`<div class="file-folder">📁 ${folder}/</div>`;
+      html+=items.map(f=>`<div class="file-item"><span>${f.path.split('/').slice(1).join('/')}</span><span class="file-size">${f.size_kb} KB</span></div>`).join('');
+    }
+    document.getElementById('fileList').innerHTML=html;
+    unlockStep('results');
+  }catch(e){document.getElementById('fileList').innerHTML=`<div style="color:var(--error)">Error: ${e.message}</div>`}
+}
+
+function downloadResults(){
+  if(!activeJobId){toast('No active job','error');return}
+  window.location.href=`/jobs/${activeJobId}/results`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Exports
+// ════════════════════════════════════════════════════════════════════════════
+function downloadConfig(){
+  const cfg=buildConfig();if(!cfg)return;
+  function toYaml(obj,indent=0){const pad='  '.repeat(indent);return Object.entries(obj).map(([k,v])=>{if(v===null)return`${pad}${k}: null`;if(typeof v==='object'&&!Array.isArray(v))return`${pad}${k}:\n${toYaml(v,indent+1)}`;if(Array.isArray(v))return`${pad}${k}: [${v.join(', ')}]`;return`${pad}${k}: ${v}`}).join('\n')}
+  const blob=new Blob([toYaml(cfg)],{type:'text/yaml'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'config.yaml'}).click();
+}
+function downloadParInf(){
+  if(!allParams.length){toast('Visit Setup tab first','info');return}
+  const sel=getSelectedParams();if(!sel.length){toast('No parameters selected','error');return}
+  const lines=['# par_inf.txt — SUFI-2 parameter ranges','# name                    min          max    change_type',...sel.map(p=>`${p.name.padEnd(24)} ${String(p.min).padStart(12)} ${String(p.max).padStart(12)}  ${p.change_type}`)];
+  const blob=new Blob([lines.join('\n')+'\n'],{type:'text/plain'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'par_inf.txt'}).click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Toast
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.color=type==='error'?'var(--error)':type==='ok'?'var(--success)':'var(--text)';
+  el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Floating log button & modal
+// ════════════════════════════════════════════════════════════════════════════
+
+// Central log store — all phases append here
+const sessionLogs = [];
+let hasError = false;
+
+function appendSessionLog(line) {
+  sessionLogs.push(line);
+  if (line.includes('ERROR') || line.includes('error')) {
+    hasError = true;
+    document.getElementById('floatLogBtn').classList.add('has-error');
+    document.getElementById('floatLogLabel').textContent = 'Error!';
+  }
+  // If modal is open, keep it updated
+  const modal = document.getElementById('logModal');
+  if (!modal.classList.contains('hidden')) {
+    renderLogModal();
+  }
+}
+
+function openLogModal() {
+  renderLogModal();
+  document.getElementById('logModal').classList.remove('hidden');
+}
+
+function closeLogModal() {
+  document.getElementById('logModal').classList.add('hidden');
+}
+
+function renderLogModal() {
+  const el = document.getElementById('logModalContent');
+  if (!sessionLogs.length) {
+    el.textContent = 'No logs yet. Start a calibration run to see logs here.';
+    document.getElementById('logModalMeta').textContent = '—';
+    return;
+  }
+  // Colour-code lines
+  el.innerHTML = sessionLogs.map(line => {
+    let color = '';
+    if (line.includes('ERROR') || line.includes('error')) color = 'color:var(--error)';
+    else if (line.includes('WARNING') || line.includes('WARNING')) color = 'color:var(--warning)';
+    else if (line.includes('✓') || line.includes('complete')) color = 'color:var(--success)';
+    return color ? `<span style="${color}">${escHtml(line)}</span>` : escHtml(line);
+  }).join('
+');
+  el.scrollTop = el.scrollHeight;
+  const errors = sessionLogs.filter(l => l.includes('ERROR')).length;
+  const warns  = sessionLogs.filter(l => l.includes('WARNING')).length;
+  document.getElementById('logModalMeta').textContent =
+    `${sessionLogs.length} lines · ${errors} error(s) · ${warns} warning(s)`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyLog() {
+  if (!sessionLogs.length) { toast('No logs to copy', 'info'); return; }
+  navigator.clipboard.writeText(sessionLogs.join('
+'))
+    .then(() => toast('Logs copied to clipboard ✓', 'ok'))
+    .catch(() => {
+      // Fallback for browsers without clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = sessionLogs.join('
+');
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('Logs copied ✓', 'ok');
+    });
+}
+
+function clearLog() {
+  sessionLogs.length = 0;
+  hasError = false;
+  document.getElementById('floatLogBtn').classList.remove('has-error');
+  document.getElementById('floatLogLabel').textContent = 'Logs';
+  renderLogModal();
+}
+
+// Keyboard shortcut: Escape to close modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLogModal();
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════════
+waitForServer().then(ok=>{if(ok){loadParams()}});
+</script>
+</body>
+</html>
