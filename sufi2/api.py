@@ -18,7 +18,7 @@ Phased endpoints:
 """
 from __future__ import annotations
 
-import asyncio, gc, io, json, logging, shutil, tempfile, threading, time, uuid, zipfile
+import asyncio, gc, io, json, logging, math, shutil, tempfile, threading, time, uuid, zipfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -32,6 +32,17 @@ from sufi2.config import SUFI2Config
 from sufi2.logger import get_logger, read_log_tail, get_log_path
 
 log = get_logger("sufi2.api")
+
+
+def _sanitise(obj):
+    """Recursively replace inf/nan with None so JSON serialisation never fails."""
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: _sanitise(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitise(v) for v in obj]
+    return obj
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job store
@@ -400,7 +411,7 @@ def _run_phase(job: Job, cfg: SUFI2Config, phase: str):
         else:
             raise ValueError(f"Unknown phase: {phase}")
 
-        job.result = result
+        job.result = _sanitise(result)
         job.status = "done"
         job.emit(f"{phase.capitalize()} complete ✓", 1.0)
         gc.collect()
@@ -433,7 +444,7 @@ def _run_phase_existing(job: Job, phase: str):
         else:
             raise ValueError(f"Unknown phase: {phase}")
 
-        job.result = result
+        job.result = _sanitise(result)
         job.status = "done"
         job.emit(f"{phase.capitalize()} complete ✓", 1.0)
         gc.collect()
