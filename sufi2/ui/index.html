@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SUFI-2 SWAT Calibration Tool</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--surface3:#30363d;
+  --border:#30363d;--border2:#21262d;
+  --accent:#2f81f7;--accent2:#388bfd;--accent-dim:#1f6feb33;
+  --success:#3fb950;--warning:#d29922;--error:#f85149;--info:#58a6ff;
+  --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
+  --radius:6px;--radius2:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;font-size:14px;line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.85em;background:var(--surface3);padding:.1em .35em;border-radius:3px}
+kbd{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;font-size:.8rem;font-family:var(--mono)}
+
+/* ── Layout ── */
+.app-header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;position:sticky;top:0;z-index:100;height:52px;display:flex;align-items:center;gap:1rem}
+.app-header .logo{font-weight:700;font-size:1rem;color:var(--text);display:flex;align-items:center;gap:.5rem}
+.app-header .logo svg{color:var(--accent)}
+.version-badge{background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:.1rem .55rem;font-size:.72rem;font-weight:600}
+.header-links{margin-left:auto;display:flex;align-items:center;gap:1rem;font-size:.82rem;color:var(--text2)}
+.header-links a{color:var(--text2);display:flex;align-items:center;gap:.3rem}
+.header-links a:hover{color:var(--text)}
+
+.app-body{max-width:1100px;margin:0 auto;padding:1.5rem 1.5rem 4rem}
+
+/* ── Wake overlay ── */
+#wakeOverlay{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem}
+.wake-logo{font-size:2rem;font-weight:800;letter-spacing:-1px}
+.wake-logo span{color:var(--accent)}
+.wake-bar-wrap{width:240px;height:3px;background:var(--surface3);border-radius:999px;overflow:hidden}
+.wake-bar{height:100%;background:linear-gradient(90deg,var(--accent),#58a6ff);border-radius:999px;transition:width .4s}
+
+/* ── Stepper ── */
+.stepper{display:flex;align-items:center;margin-bottom:1.5rem;overflow-x:auto;padding-bottom:.25rem;gap:0}
+.step{display:flex;flex-direction:column;align-items:center;min-width:110px;cursor:pointer;position:relative;padding:.25rem}
+.step:not(:last-child)::after{content:'';position:absolute;top:15px;left:55%;width:90%;height:1px;background:var(--border);z-index:0}
+.step.done:not(:last-child)::after{background:var(--success)}
+.step-circle{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;z-index:1;transition:all .2s}
+.step.active .step-circle{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+.step.done   .step-circle{border-color:var(--success);background:#3fb95022;color:var(--success)}
+.step.locked .step-circle{opacity:.35;cursor:not-allowed}
+.step-label{font-size:.72rem;color:var(--text2);margin-top:.35rem;text-align:center;font-weight:500;white-space:nowrap}
+.step.active .step-label{color:var(--text)}
+.step.done   .step-label{color:var(--success)}
+.step-opt{font-size:.65rem;color:var(--text3)}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:1.25rem;margin-bottom:1.25rem}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.card-title{font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.card-body{}
+
+/* ── Project bar ── */
+.project-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+.project-bar label{font-size:.8rem;color:var(--text2);font-weight:500;white-space:nowrap}
+#projectNameInput{flex:1;min-width:160px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.85rem;padding:.4rem .65rem;outline:none}
+#projectNameInput:focus{border-color:var(--accent)}
+.project-bar select{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.82rem;padding:.4rem .65rem;outline:none;max-width:180px}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr}}
+.form-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:640px){.form-grid.cols3{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:.3rem}
+.field label{font-size:.78rem;color:var(--text2);font-weight:500}
+.field label .req{color:var(--error);margin-left:2px}
+.field label .opt{color:var(--text3);font-weight:400;font-size:.72rem}
+input[type=text],input[type=number],input[type=date],select,textarea{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+  color:var(--text);font-size:.85rem;padding:.45rem .65rem;outline:none;
+  transition:border-color .15s;width:100%;font-family:var(--font)
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+textarea{resize:vertical;min-height:60px;font-family:var(--mono);font-size:.8rem}
+.hint{font-size:.72rem;color:var(--text3);margin-top:.2rem;line-height:1.5}
+hr{border:none;border-top:1px solid var(--border);margin:1rem 0}
+.section-title{font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem 1rem;border:none;border-radius:var(--radius);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--font)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent2)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover:not(:disabled){background:var(--surface3)}
+.btn-success{background:#238636;color:#fff;border:1px solid #2ea043}
+.btn-success:hover:not(:disabled){background:#2ea043}
+.btn-danger{background:transparent;color:var(--error);border:1px solid var(--error)}
+.btn-sm{padding:.3rem .7rem;font-size:.78rem}
+.btn-xs{padding:.2rem .5rem;font-size:.72rem}
+.actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+
+/* ── Upload zone ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius2);padding:2rem;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:var(--accent-dim)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone-icon{font-size:2rem;margin-bottom:.5rem}
+.upload-zone h3{font-size:.9rem;font-weight:600;margin-bottom:.25rem}
+.upload-zone p{font-size:.78rem;color:var(--text2)}
+
+.file-chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.75rem}
+.file-chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.15rem .5rem;font-size:.72rem;font-family:var(--mono)}
+.chip-ext-csv{border-color:#3fb95044;color:#3fb950}
+.chip-ext-rch{border-color:#2f81f744;color:#2f81f7}
+.chip-ext-cio{border-color:#d2992244;color:#d29922}
+.chip-ext-mgt,.chip-ext-gw,.chip-ext-sol,.chip-ext-hru,.chip-ext-rte,.chip-ext-bsn{border-color:#8b949e44;color:#8b949e}
+
+.file-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.5rem;margin-top:.75rem}
+.file-summary-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .75rem}
+.fsi-count{font-size:1.2rem;font-weight:700;color:var(--text)}
+.fsi-label{font-size:.72rem;color:var(--text2);margin-top:.1rem}
+.fsi-ok{border-color:var(--success)44;background:#3fb95011}
+.fsi-warn{border-color:var(--warning)44;background:#d2992211}
+.fsi-err{border-color:var(--error)44;background:#f8514911}
+
+/* ── Scan grid ── */
+.scan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;margin-top:.75rem}
+.si{border-radius:var(--radius);padding:.55rem .75rem;border:1px solid var(--border);background:var(--surface2)}
+.si.ok{background:#3fb95011;border-color:#3fb95044}
+.si.miss{background:#f8514911;border-color:#f8514944}
+.si-row{display:flex;align-items:center;gap:.45rem}
+.si-lbl{font-family:var(--mono);font-size:.78rem}
+.si-det{font-size:.7rem;color:var(--text2);margin-top:.2rem;word-break:break-all}
+
+/* ── Parameter table ── */
+.param-toolbar{display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem;flex-wrap:wrap}
+.param-toolbar input[type=text]{flex:1;min-width:160px;font-size:.8rem;padding:.35rem .6rem}
+.param-table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table.params{width:100%;border-collapse:collapse;font-size:.82rem}
+table.params thead tr{background:var(--surface2)}
+table.params th{padding:.5rem .65rem;text-align:left;color:var(--text2);font-weight:500;white-space:nowrap;border-bottom:1px solid var(--border)}
+table.params td{padding:.35rem .55rem;border-top:1px solid var(--border2);vertical-align:middle}
+table.params tr:hover td{background:var(--surface2)}
+table.params input[type=number]{width:85px;padding:.25rem .45rem;font-size:.78rem;-moz-appearance:textfield}
+table.params input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+table.params select{width:75px;padding:.25rem .4rem;font-size:.78rem}
+table.params input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+.pname{font-family:var(--mono);font-size:.8rem;color:var(--accent)}
+.bext{display:inline-block;padding:.1rem .4rem;border-radius:3px;font-size:.7rem;font-weight:600;font-family:var(--mono)}
+.ext-mgt{background:#3fb95022;color:#3fb950}.ext-gw{background:#2f81f722;color:#2f81f7}
+.ext-sol{background:#d2992222;color:#d29922}.ext-hru{background:#bc8cff22;color:#bc8cff}
+.ext-rte{background:#ff7b7222;color:#ff7b72}.ext-bsn{background:#7ee78722;color:#7ee787}
+
+/* ── Monitor ── */
+.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.15rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600}
+.badge-queued{background:var(--surface3);color:var(--text2)}
+.badge-running{background:#1f6feb33;color:var(--info)}
+.badge-done{background:#3fb95022;color:var(--success)}
+.badge-error{background:#f8514922;color:var(--error)}
+.progress-wrap{background:var(--surface3);border-radius:999px;height:4px;overflow:hidden;margin:.65rem 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),#58a6ff);border-radius:999px;transition:width .4s}
+.log-console{background:#010409;border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;font-family:var(--mono);font-size:.75rem;color:#8b949e;height:220px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;line-height:1.6}
+.log-error{color:var(--error)}.log-ok{color:var(--success)}.log-warn{color:var(--warning)}
+
+/* ── Metrics table ── */
+table.metrics{width:100%;border-collapse:collapse;font-size:.85rem}
+table.metrics th{text-align:left;padding:.45rem .65rem;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2)}
+table.metrics td{padding:.5rem .65rem;border-bottom:1px solid var(--border2)}
+table.metrics tr:last-child td{border-bottom:none}
+.good{color:var(--success)}.warn{color:var(--warning)}.bad{color:var(--error)}
+
+/* ── Charts grid ── */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1rem;margin-top:1rem}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden}
+.chart-card-header{padding:.65rem 1rem;background:var(--surface2);border-bottom:1px solid var(--border);font-size:.78rem;font-weight:600;color:var(--text2)}
+.chart-card img{width:100%;display:block;background:var(--bg)}
+.chart-card .chart-empty{padding:2rem;text-align:center;color:var(--text3);font-size:.8rem}
+
+/* ── Best params table ── */
+.best-params-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;margin-top:.75rem}
+.bp-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .75rem}
+.bp-name{font-family:var(--mono);font-size:.78rem;color:var(--accent)}
+.bp-val{font-size:1rem;font-weight:700;margin-top:.15rem}
+.bp-range{font-size:.7rem;color:var(--text3);margin-top:.1rem}
+
+/* ── File browser ── */
+.file-browser{font-size:.8rem}
+.fb-folder{color:var(--accent);font-weight:600;margin-top:.75rem;margin-bottom:.25rem;font-family:var(--mono)}
+.fb-item{display:flex;justify-content:space-between;padding:.2rem .5rem;border-radius:4px;font-family:var(--mono)}
+.fb-item:hover{background:var(--surface2)}
+.fb-size{color:var(--text3);font-size:.72rem}
+
+/* ── Floating log ── */
+#floatLogBtn{position:fixed;bottom:1.25rem;left:1.25rem;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:.4rem .8rem;font-size:.75rem;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:all .15s}
+#floatLogBtn:hover{border-color:var(--accent);color:var(--text)}
+#floatLogBtn.has-error{border-color:var(--error);color:var(--error)}
+#logModal{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center}
+#logModalBox{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius2);width:min(900px,95vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+#logModalHeader{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;border-bottom:1px solid var(--border)}
+#logModalHeader h3{font-size:.9rem;font-weight:600}
+#logModalContent{flex:1;overflow-y:auto;padding:1rem 1.25rem;font-family:var(--mono);font-size:.75rem;color:#8b949e;white-space:pre-wrap;word-break:break-all;background:#010409;line-height:1.6}
+#logModalFooter{display:flex;gap:.6rem;padding:.75rem 1.25rem;border-top:1px solid var(--border)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:1.25rem;right:1.25rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:.6rem 1rem;font-size:.82rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:400;max-width:320px}
+#toast.show{opacity:1}
+#toast.t-ok{border-color:var(--success);color:var(--success)}
+#toast.t-err{border-color:var(--error);color:var(--error)}
+#toast.t-info{border-color:var(--info);color:var(--info)}
+
+/* ── Info banner ── */
+.banner{border-radius:var(--radius);padding:.65rem 1rem;font-size:.82rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.6rem}
+.banner-info{background:#1f6feb22;border:1px solid #1f6feb55;color:var(--info)}
+.banner-warn{background:#d2992222;border:1px solid #d2992255;color:var(--warning)}
+.banner-success{background:#3fb95022;border:1px solid #3fb95055;color:var(--success)}
+
+/* ── Misc ── */
+.hidden{display:none!important}
+.text-muted{color:var(--text2)}
+.text-sm{font-size:.78rem}
+.mt1{margin-top:.5rem}.mt2{margin-top:1rem}
+.flex{display:flex}.items-center{align-items:center}.gap1{gap:.5rem}.gap2{gap:1rem}
+.ml-auto{margin-left:auto}
+details summary{cursor:pointer;font-size:.8rem;color:var(--text2);user-select:none;padding:.3rem 0;list-style:none}
+details summary::before{content:'▶ ';font-size:.65rem}
+details[open] summary::before{content:'▼ '}
+</style>
+</head>
+<body>
+
+<!-- Wake overlay -->
+<div id="wakeOverlay">
+  <div class="wake-logo">SUFI<span>-2</span></div>
+  <div style="color:var(--text2);font-size:.85rem" id="wakeMsg">Connecting to server…</div>
+  <div class="wake-bar-wrap"><div class="wake-bar" id="wakeBar" style="width:0%"></div></div>
+  <div style="font-size:.72rem;color:var(--text3)" id="wakeNote"></div>
+</div>
+
+<!-- App header -->
+<header class="app-header">
+  <div class="logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    SUFI-2 SWAT Calibration
+  </div>
+  <span class="version-badge">v2.0</span>
+  <div class="header-links">
+    <a href="/docs" target="_blank">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      API Docs
+    </a>
+    <a href="https://github.com/your-org/sufi2-swat" target="_blank">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <!-- Project bar -->
+  <div class="project-bar">
+    <label>Project:</label>
+    <input type="text" id="projectNameInput" placeholder="My Calibration Project" maxlength="60"/>
+    <button class="btn btn-secondary btn-sm" onclick="saveProject()">💾 Save</button>
+    <select id="projectSelect" onchange="loadProjectFromSelect(this)" style="max-width:200px">
+      <option value="">— Load saved project —</option>
+    </select>
+    <button class="btn btn-secondary btn-sm" onclick="exportProject()">⬇ Export .json</button>
+    <label class="btn btn-secondary btn-sm" style="cursor:pointer">
+      ⬆ Import .json
+      <input type="file" accept=".json" style="display:none" onchange="importProject(this)"/>
+    </label>
+  </div>
+
+  <!-- Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="step active" id="step-setup"       onclick="goStep('setup')">
+      <div class="step-circle">1</div><div class="step-label">Setup</div>
+    </div>
+    <div class="step locked" id="step-calibration" onclick="goStep('calibration')">
+      <div class="step-circle">2</div><div class="step-label">Calibration</div>
+    </div>
+    <div class="step locked" id="step-validation"  onclick="goStep('validation')">
+      <div class="step-circle">3</div><div class="step-label">Validation</div>
+    </div>
+    <div class="step locked" id="step-forecast"    onclick="goStep('forecast')">
+      <div class="step-circle">4</div><div class="step-label">Hindcast/Forecast<br><span class="step-opt">(optional)</span></div>
+    </div>
+    <div class="step locked" id="step-results"     onclick="goStep('results')">
+      <div class="step-circle">5</div><div class="step-label">Results</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1 — SETUP                                              -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <div id="panel-setup">
+
+    <!-- File upload -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">TxtInOut Files</span>
+        <span class="text-sm text-muted" id="uploadCount"></span>
+      </div>
+      <div class="banner banner-info">
+        <span>☁️</span>
+        <span>Select all files from your <code>TxtInOut</code> folder — <kbd>Ctrl+A</kbd> to select all, then Open. Required: <code>output.rch</code>, <code>file.cio</code>, <code>observed_flow_rchN.csv</code> (one per reach), plus <code>*.mgt .gw .sol .hru .rte .bsn</code>.</span>
+      </div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="swatFileUpload" multiple
+          accept=".csv,.rch,.cio,.mgt,.gw,.sol,.hru,.rte,.bsn,.txt,.exe,.pcp,.tmp,.slr,.hmd,.wnd"
+          onchange="handleFileUpload(this)"/>
+        <div class="upload-zone-icon">📂</div>
+        <h3>Click to select TxtInOut files</h3>
+        <p>or drag and drop your files here</p>
+      </div>
+      <div id="fileSummary" class="hidden"></div>
+      <div id="uploadScan" class="hidden" style="margin-top:.75rem">
+        <div class="flex items-center gap1" style="margin-bottom:.5rem">
+          <span id="uploadScanIcon" style="font-size:1.1rem">📂</span>
+          <span id="uploadScanText" style="font-size:.85rem;font-weight:600"></span>
+        </div>
+        <div class="scan-grid" id="uploadScanGrid"></div>
+        <div id="uploadScanMsgs" style="margin-top:.5rem;font-size:.78rem"></div>
+      </div>
+    </div>
+
+    <!-- Calibration settings -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Calibration Settings</span></div>
+      <div class="form-grid cols3">
+        <div class="field"><label>Iterations <span class="req">*</span></label><input type="number" id="iterations" placeholder="e.g. 3" min="1" max="50"/></div>
+        <div class="field"><label>Samples per Iteration <span class="req">*</span></label><input type="number" id="n_samples" placeholder="e.g. 500" min="10" max="5000"/></div>
+        <div class="field">
+          <label>Objective Function <span class="req">*</span></label>
+          <select id="obj_func">
+            <option value="">— Select —</option>
+            <option value="NSE">NSE — Nash-Sutcliffe</option>
+            <option value="KGE">KGE — Kling-Gupta</option>
+            <option value="R2">R² — Coefficient of Determination</option>
+          </select>
+        </div>
+        <div class="field"><label>Top Fraction <span class="req">*</span></label><input type="number" id="top_fraction" placeholder="e.g. 0.10" min="0.01" max="0.99" step="0.01"/><span class="hint">Fraction of best runs used to narrow ranges</span></div>
+        <div class="field"><label>Warm-up Years <span class="req">*</span></label><input type="number" id="warmup_years" placeholder="e.g. 3" min="0" max="10"/></div>
+        <div class="field"><label>Random Seed <span class="req">*</span></label><input type="number" id="seed" placeholder="e.g. 42"/></div>
+      </div>
+    </div>
+
+    <!-- Periods -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Simulation Periods</span></div>
+      <div class="form-grid">
+        <div class="field"><label>Calibration Start <span class="req">*</span></label><input type="date" id="calib_start"/></div>
+        <div class="field"><label>Calibration End <span class="req">*</span></label><input type="date" id="calib_end"/></div>
+        <div class="field"><label>Validation Start <span class="req">*</span></label><input type="date" id="valid_start"/></div>
+        <div class="field"><label>Validation End <span class="req">*</span></label><input type="date" id="valid_end"/></div>
+        <div class="field"><label>Hindcast Start <span class="opt">(optional)</span></label><input type="date" id="hind_start"/></div>
+        <div class="field"><label>Hindcast End</label><input type="date" id="hind_end"/></div>
+        <div class="field"><label>Forecast Start <span class="opt">(optional)</span></label><input type="date" id="fore_start"/></div>
+        <div class="field"><label>Forecast End</label><input type="date" id="fore_end"/></div>
+      </div>
+    </div>
+
+    <!-- Reaches -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Reaches & Weights</span></div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Reach IDs <span class="opt">(optional — auto-detected from uploaded files)</span></label>
+          <input type="text" id="reach_ids" placeholder="e.g. 13,15,16,17  or  16  or leave blank for all"/>
+          <span class="hint">Only the reaches you enter will be calibrated, regardless of how many observed flow files you upload.</span>
+        </div>
+        <div class="field">
+          <label>Reach Weights <span class="opt">(optional JSON, must sum to 1.0)</span></label>
+          <textarea id="reach_weights" placeholder='{"16": 1.0}  or  {"13":0.25,"15":0.25,"16":0.25,"17":0.25}'></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Parameters to Calibrate</span>
+        <span class="text-sm text-muted" id="selCount"></span>
+      </div>
+      <div class="param-toolbar">
+        <input type="text" id="paramSearch" placeholder="🔍  Filter parameters…" oninput="filterParams()"/>
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(true)">Select All</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectAll(false)">None</button>
+        <button class="btn btn-secondary btn-sm" onclick="resetRanges()">Reset Ranges</button>
+        <button class="btn btn-secondary btn-sm" onclick="downloadParInf()">⬇ par_inf.txt</button>
+      </div>
+      <div class="param-table-wrap">
+        <table class="params">
+          <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="checkAll" onchange="toggleAll(this)"/></th>
+            <th>Parameter</th><th>File</th><th>Min</th><th>Max</th><th>Change</th><th>Description</th>
+          </tr></thead>
+          <tbody id="paramBody"><tr><td colspan="7" style="text-align:center;color:var(--text3);padding:1.5rem">Loading parameters…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="mt1 text-sm text-muted">
+        <strong style="color:var(--text2)">Change types:</strong>&nbsp;
+        <code>v</code> replace &nbsp;|&nbsp; <code>r</code> relative: orig×(1+val) &nbsp;|&nbsp; <code>a</code> additive: orig+val
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" onclick="startCalibration()">▶ Start Calibration</button>
+      <button class="btn btn-secondary" onclick="downloadConfig()">⬇ config.yaml</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2 — CALIBRATION                                        -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <div id="panel-calibration" class="hidden">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Calibration</span>
+        <div class="flex items-center gap1">
+          <span style="font-family:var(--mono);font-size:.8rem;color:var(--accent)" id="calib-jobId"></span>
+          <span class="badge badge-queued" id="calib-badge">queued</span>
+          <span class="text-sm text-muted" id="calib-pct">0%</span>
+        </div>
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" id="calib-bar" style="width:0%"></div></div>
+      <div class="log-console" id="calib-log">Waiting for logs…</div>
+    </div>
+    <div class="card hidden" id="calib-summary">
+      <div class="card-header"><span class="card-title">Calibration Complete</span></div>
+      <div id="calib-summary-body"></div>
+      <div class="actions">
+        <button class="btn btn-success" onclick="goStep('validation')">▶ Run Validation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3 — VALIDATION                                         -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <div id="panel-validation" class="hidden">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Validation</span>
+        <span class="badge badge-queued" id="val-badge">ready</span>
+      </div>
+      <p class="text-sm text-muted" style="margin-bottom:.75rem">
+        Applies best calibrated parameters to the validation period (<span id="val-period">—</span>).
+      </p>
+      <div class="progress-wrap"><div class="progress-bar" id="val-bar" style="width:0%"></div></div>
+      <div class="log-console" id="val-log" style="height:160px">Click Run Validation to start…</div>
+      <div class="actions">
+        <button class="btn btn-primary" id="val-run-btn" onclick="runValidation()">▶ Run Validation</button>
+      </div>
+    </div>
+    <div class="card hidden" id="val-results">
+      <div class="card-header"><span class="card-title">Validation Metrics</span></div>
+      <table class="metrics" id="val-metrics-table">
+        <thead><tr><th>Reach</th><th>NSE</th><th>KGE</th><th>R²</th><th>PBIAS (%)</th><th>Rating</th></tr></thead>
+        <tbody id="val-metrics-body"></tbody>
+      </table>
+      <div class="actions">
+        <button class="btn btn-success" onclick="goStep('results')">📊 View Results</button>
+        <button class="btn btn-secondary" onclick="goStep('forecast')">▶ Hindcast/Forecast <span class="text-muted">(optional)</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4 — HINDCAST / FORECAST                                -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <div id="panel-forecast" class="hidden">
+    <div class="banner banner-info"><span>ℹ️</span><span>Hindcast and Forecast are optional. Results are already available from Validation.</span></div>
+    <div class="form-grid">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-header"><span class="card-title">Hindcast</span></div>
+        <p class="text-sm text-muted" style="margin-bottom:.75rem">Simulation only · Period: <strong id="hind-period">—</strong></p>
+        <div class="progress-wrap"><div class="progress-bar" id="hind-bar" style="width:0%"></div></div>
+        <div class="log-console" id="hind-log" style="height:120px">Click Run Hindcast to start…</div>
+        <div class="actions"><button class="btn btn-primary btn-sm" id="hind-run-btn" onclick="runHindcast()">▶ Run Hindcast</button></div>
+        <div id="hind-stats" class="hidden mt2"></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-header"><span class="card-title">Forecast</span></div>
+        <p class="text-sm text-muted" style="margin-bottom:.75rem">Simulation only · Period: <strong id="fore-period">—</strong></p>
+        <div class="progress-wrap"><div class="progress-bar" id="fore-bar" style="width:0%"></div></div>
+        <div class="log-console" id="fore-log" style="height:120px">Click Run Forecast to start…</div>
+        <div class="actions"><button class="btn btn-primary btn-sm" id="fore-run-btn" onclick="runForecast()">▶ Run Forecast</button></div>
+        <div id="fore-stats" class="hidden mt2"></div>
+      </div>
+    </div>
+    <div class="actions mt2">
+      <button class="btn btn-success" onclick="goStep('results')">📊 View Results</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5 — RESULTS                                            -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <div id="panel-results" class="hidden">
+
+    <!-- Summary metrics -->
+    <div class="card" id="results-metrics-card">
+      <div class="card-header">
+        <span class="card-title">Validation Metrics</span>
+        <button class="btn btn-secondary btn-sm" onclick="downloadResults()">⬇ Download All (ZIP)</button>
+      </div>
+      <div id="results-metrics-body"><p class="text-sm text-muted">Run validation to see metrics.</p></div>
+    </div>
+
+    <!-- Best parameters -->
+    <div class="card" id="results-params-card">
+      <div class="card-header"><span class="card-title">Best Calibrated Parameters</span></div>
+      <div id="results-params-body"><p class="text-sm text-muted">Run calibration to see best parameters.</p></div>
+    </div>
+
+    <!-- Charts — 95PPU per reach -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">95PPU Plots — Per Reach</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadCharts()">↻ Refresh</button>
+      </div>
+      <div class="charts-grid" id="charts-ppu"></div>
+    </div>
+
+    <!-- Charts — Sensitivity per reach -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Sensitivity Analysis — Per Reach</span></div>
+      <div class="charts-grid" id="charts-sensitivity"></div>
+    </div>
+
+    <!-- Charts — Dotty plots per reach -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Dotty Plots — Per Reach</span></div>
+      <div class="charts-grid" id="charts-dotty"></div>
+    </div>
+
+    <!-- Convergence -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Convergence</span></div>
+      <div class="charts-grid" id="charts-convergence"></div>
+    </div>
+
+    <!-- File browser -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Output Files</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadResultFiles()">↻ Refresh</button>
+      </div>
+      <div id="fileList" class="file-browser"><p class="text-sm text-muted">Click Refresh to load file list.</p></div>
+    </div>
+  </div>
+
+</div><!-- /app-body -->
+
+<!-- Floating log button -->
+<div id="floatLogBtn" onclick="openLogModal()">
+  📋 <span id="floatLogLabel">Logs</span>
+</div>
+
+<!-- Log modal -->
+<div id="logModal" class="hidden" onclick="if(event.target===this)closeLogModal()">
+  <div id="logModalBox">
+    <div id="logModalHeader">
+      <h3>Session Log</h3>
+      <div class="flex gap1">
+        <button class="btn btn-secondary btn-sm" onclick="copyLog()">📋 Copy</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearLog()">🗑 Clear</button>
+        <button class="btn btn-secondary btn-sm" onclick="closeLogModal()">✕</button>
+      </div>
+    </div>
+    <div id="logModalContent">No logs yet.</div>
+    <div id="logModalFooter">
+      <span class="text-sm text-muted" id="logModalMeta">—</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════════════
+// Constants & state
+// ════════════════════════════════════════════════════════════════════════════
+const VERSION = '2.0.0';
+const PARAM_DESCS = {
+  'CN2.mgt':'Curve Number — surface runoff','ALPHA_BF.gw':'Baseflow recession constant',
+  'GW_DELAY.gw':'Groundwater delay (days)','GWQMN.gw':'Threshold for return flow (mm)',
+  'GW_REVAP.gw':'Revap coefficient','REVAPMN.gw':'Threshold for revap (mm)',
+  'SOL_AWC.sol':'Available water capacity','SOL_K.sol':'Saturated hydraulic conductivity',
+  'SOL_BD.sol':'Moist bulk density','ESCO.hru':'Soil evaporation compensation',
+  'EPCO.hru':'Plant uptake compensation','CH_N2.rte':"Manning's n (main channel)",
+  'CH_K2.rte':'Effective hydraulic conductivity','SURLAG.bsn':'Surface runoff lag',
+  'SMFMX.bsn':'Max snow melt rate','SPCON.bsn':'Max re-entrained sediment',
+  'SPEXP.bsn':'Re-entrainment exponent','CH_EROD.rte':'Channel erodibility',
+  'CH_COV.rte':'Channel cover factor','USLE_P.mgt':'USLE support practice factor',
+};
+const SWAT_EXTS = new Set(['.csv','.rch','.cio','.mgt','.gw','.sol','.hru','.rte','.bsn','.txt','.exe','.pcp','.tmp','.slr','.hmd','.wnd','.fig','.sub','.bsn']);
+
+let allParams     = [];
+let uploadedFiles = [];
+let activeJobId   = null;
+let sseSource     = null;
+let pollTimer     = null;
+let sessionLogs   = [];
+let hasError      = false;
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wake-up
+// ════════════════════════════════════════════════════════════════════════════
+async function waitForServer(maxMs=90000){
+  const overlay=document.getElementById('wakeOverlay');
+  const msg=document.getElementById('wakeMsg');
+  const bar=document.getElementById('wakeBar');
+  const note=document.getElementById('wakeNote');
+  const start=Date.now(); let attempt=0;
+  while(Date.now()-start<maxMs){
+    attempt++;
+    const e=Date.now()-start;
+    bar.style.width=Math.min((e/maxMs)*100,95)+'%';
+    if(e>5000){msg.textContent='Server waking up (~30s on free tier)…';note.textContent=`Attempt ${attempt} · ${Math.round(e/1000)}s`}
+    try{const r=await fetch('/health',{signal:AbortSignal.timeout(4000)});if(r.ok){bar.style.width='100%';msg.textContent='Connected ✓';await new Promise(r=>setTimeout(r,300));overlay.style.transition='opacity .4s';overlay.style.opacity='0';await new Promise(r=>setTimeout(r,400));overlay.style.display='none';return true}}catch{}
+    await new Promise(r=>setTimeout(r,2000));
+  }
+  msg.textContent='Server not responding.';bar.style.background='var(--error)';return false;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Stepper
+// ════════════════════════════════════════════════════════════════════════════
+const STEPS=['setup','calibration','validation','forecast','results'];
+let stepsUnlocked=new Set(['setup']);
+
+function goStep(id){
+  if(!stepsUnlocked.has(id)){toast('Complete the previous step first','err');return}
+  STEPS.forEach(s=>{
+    document.getElementById(`panel-${s}`).classList.toggle('hidden',s!==id);
+    const el=document.getElementById(`step-${s}`);
+    el.classList.remove('active','locked');
+    if(s===id)el.classList.add('active');
+    else if(!stepsUnlocked.has(s))el.classList.add('locked');
+  });
+  if(id==='results'){loadCharts();loadResultFiles();renderResultsMetrics();renderBestParams()}
+}
+function unlockStep(id){stepsUnlocked.add(id);document.getElementById(`step-${id}`)?.classList.remove('locked')}
+function markStepDone(id){document.getElementById(`step-${id}`)?.classList.add('done')}
+
+// ════════════════════════════════════════════════════════════════════════════
+// File upload
+// ════════════════════════════════════════════════════════════════════════════
+function handleFileUpload(input){
+  // Filter to SWAT-relevant files only
+  const all=Array.from(input.files);
+  uploadedFiles=all.filter(f=>{
+    const ext='.'+f.name.split('.').pop().toLowerCase();
+    return SWAT_EXTS.has(ext)||f.name.toLowerCase().includes('observed')||f.name.toLowerCase().includes('output');
+  });
+  const skipped=all.length-uploadedFiles.length;
+  document.getElementById('uploadCount').textContent=`${uploadedFiles.length} file${uploadedFiles.length!==1?'s':''} staged${skipped>0?` (${skipped} non-SWAT skipped)`:''}`;
+  renderFileSummary(uploadedFiles);
+  scanUploadedFiles(uploadedFiles);
+  if(uploadedFiles.length)toast(`${uploadedFiles.length} files staged`,'ok');
+}
+
+function renderFileSummary(files){
+  const groups={};
+  files.forEach(f=>{
+    const ext='.'+f.name.split('.').pop().toLowerCase();
+    const key=f.name.toLowerCase().match(/^observed/)?'observed CSV':ext;
+    groups[key]=(groups[key]||0)+1;
+  });
+  const needed=['observed CSV','.rch','.cio','.mgt','.gw','.sol','.hru','.rte','.bsn'];
+  const el=document.getElementById('fileSummary');
+  el.className='file-summary';
+  el.innerHTML=needed.map(k=>{
+    const n=groups[k]||0;
+    const req=['observed CSV','.rch','.cio'].includes(k);
+    const cls=n>0?'fsi-ok':req?'fsi-err':'';
+    return `<div class="file-summary-item ${cls}"><div class="fsi-count">${n}</div><div class="fsi-label">${k}</div></div>`;
+  }).join('');
+  // Add any extra types
+  Object.entries(groups).filter(([k])=>!needed.includes(k)).forEach(([k,n])=>{
+    el.innerHTML+=`<div class="file-summary-item"><div class="fsi-count">${n}</div><div class="fsi-label">${k}</div></div>`;
+  });
+}
+
+function scanUploadedFiles(files){
+  const names=files.map(f=>f.name.toLowerCase());
+  const panel=document.getElementById('uploadScan');
+  const icon=document.getElementById('uploadScanIcon');
+  const text=document.getElementById('uploadScanText');
+  const grid=document.getElementById('uploadScanGrid');
+  const msgs=document.getElementById('uploadScanMsgs');
+  panel.classList.remove('hidden');
+
+  const obsFiles=files.filter(f=>/^(observed_flow|obs_flow)_rch\d+\.csv$/i.test(f.name));
+  const obsCount=obsFiles.length;
+
+  const checks=[
+    {key:'output_rch',  label:'output.rch',            found:names.includes('output.rch'),                          req:true},
+    {key:'obs_flow',    label:'observed_flow_rchN.csv', found:obsCount>0,                                            req:true,
+     det:obsCount>0?`${obsCount} file(s): ${obsFiles.map(f=>f.name).join(', ')}`:null},
+    {key:'file_cio',    label:'file.cio',               found:names.includes('file.cio'),                            req:false},
+    {key:'mgt',         label:'*.mgt',                  found:names.some(n=>n.endsWith('.mgt')),                     req:false,
+     det:names.filter(n=>n.endsWith('.mgt')).length?`${names.filter(n=>n.endsWith('.mgt')).length} files`:null},
+    {key:'gw',          label:'*.gw',                   found:names.some(n=>n.endsWith('.gw')),                      req:false},
+    {key:'sol',         label:'*.sol',                  found:names.some(n=>n.endsWith('.sol')),                     req:false},
+    {key:'hru',         label:'*.hru',                  found:names.some(n=>n.endsWith('.hru')),                     req:false},
+    {key:'rte',         label:'*.rte',                  found:names.some(n=>n.endsWith('.rte')),                     req:false},
+    {key:'bsn',         label:'*.bsn',                  found:names.some(n=>n.endsWith('.bsn')),                     req:false},
+    {key:'par_inf',     label:'par_inf.txt',            found:names.includes('par_inf.txt'),                         req:false, det:!names.includes('par_inf.txt')?'built-in defaults used':null},
+    {key:'swat_exe',    label:'swat_exe',               found:names.some(n=>n.startsWith('swat')&&!n.endsWith('.csv')),req:false,det:'mock runner used if absent'},
+  ];
+
+  const errors=checks.filter(c=>c.req&&!c.found);
+  const ready=errors.length===0;
+  icon.textContent=ready?'✅':'⚠️';
+  text.innerHTML=ready
+    ?`<span style="color:var(--success)">Ready — ${files.length} files, ${obsCount} reach(es) detected</span>`
+    :`<span style="color:var(--warning)">${errors.length} required file(s) missing</span>`;
+
+  grid.innerHTML=checks.map(c=>{
+    const cls=c.found?'ok':c.req?'miss':'';
+    const col=c.found?'var(--success)':c.req?'var(--error)':'var(--text3)';
+    const ico=c.found?'✓':c.req?'✗':'–';
+    const det=c.det||'';
+    return `<div class="si ${cls}"><div class="si-row"><span style="color:${col};font-weight:700;font-size:.9rem">${ico}</span><span class="si-lbl">${c.label}</span>${!c.req?'<span style="font-size:.68rem;color:var(--text3)">(opt)</span>':''}</div>${det?`<div class="si-det">${det}</div>`:''}</div>`;
+  }).join('');
+
+  msgs.innerHTML=errors.map(e=>`<div style="color:var(--error);margin:.2rem 0;font-size:.78rem">✗ <strong>${e.label}</strong> not found in selected files</div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Parameters
+// ════════════════════════════════════════════════════════════════════════════
+async function loadParams(){
+  try{
+    const data=await(await fetch('/parameters')).json();
+    allParams=data.parameters.map(p=>({...p,selected:true,_origMin:p.min,_origMax:p.max}));
+    renderParamTable();updateSelCount();
+  }catch(e){document.getElementById('paramBody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:1.5rem">Failed to load parameters</td></tr>'}
+}
+function renderParamTable(filter=''){
+  const q=filter.toLowerCase();
+  const visible=allParams.filter(p=>!q||p.name.toLowerCase().includes(q)||( PARAM_DESCS[p.name]||'').toLowerCase().includes(q));
+  const tbody=document.getElementById('paramBody');
+  if(!visible.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:1rem">No match</td></tr>';return}
+  tbody.innerHTML=visible.map(p=>{
+    const gi=allParams.indexOf(p);const ext=p.name.split('.')[1]||'';
+    const dim=!p.selected?'opacity:.35':'';
+    return`<tr><td><input type="checkbox" ${p.selected?'checked':''} onchange="toggleParam(${gi},this.checked)"/></td><td><span class="pname">${p.name.split('.')[0]}</span></td><td><span class="bext ext-${ext}">.${ext}</span></td><td><input type="number" step="any" value="${p.min}" oninput="updateParam(${gi},'min',this.value)" style="${dim}"/></td><td><input type="number" step="any" value="${p.max}" oninput="updateParam(${gi},'max',this.value)" style="${dim}"/></td><td><select onchange="updateParam(${gi},'change_type',this.value)" style="${dim}"><option value="v" ${p.change_type==='v'?'selected':''}>v</option><option value="r" ${p.change_type==='r'?'selected':''}>r</option><option value="a" ${p.change_type==='a'?'selected':''}>a</option></select></td><td style="font-size:.72rem;color:var(--text2)">${PARAM_DESCS[p.name]||''}</td></tr>`;
+  }).join('');
+}
+function updateParam(idx,f,v){allParams[idx][f]=(f==='min'||f==='max')?parseFloat(v):v}
+function toggleParam(idx,c){allParams[idx].selected=c;updateSelCount();renderParamTable(document.getElementById('paramSearch').value)}
+function filterParams(){renderParamTable(document.getElementById('paramSearch').value)}
+function selectAll(s){allParams.forEach(p=>p.selected=s);updateSelCount();renderParamTable(document.getElementById('paramSearch').value);document.getElementById('checkAll').checked=s}
+function toggleAll(cb){selectAll(cb.checked)}
+function resetRanges(){allParams.forEach(p=>{p.min=p._origMin;p.max=p._origMax});renderParamTable(document.getElementById('paramSearch').value);toast('Ranges reset','info')}
+function updateSelCount(){const n=allParams.filter(p=>p.selected).length;document.getElementById('selCount').textContent=`${n} / ${allParams.length} selected`}
+function getSelectedParams(){return allParams.filter(p=>p.selected).map(p=>({name:p.name,min:p.min,max:p.max,change_type:p.change_type}))}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Build config
+// ════════════════════════════════════════════════════════════════════════════
+function buildConfig(){
+  const rw=document.getElementById('reach_weights').value.trim();
+  let reach_weights=null;
+  if(rw){try{reach_weights=JSON.parse(rw)}catch{toast('Invalid reach_weights JSON','err');return null}}
+  const hs=document.getElementById('hind_start').value,he=document.getElementById('hind_end').value;
+  const fs=document.getElementById('fore_start').value,fe=document.getElementById('fore_end').value;
+  const periods={
+    calibration:{start:document.getElementById('calib_start').value,end:document.getElementById('calib_end').value},
+    validation: {start:document.getElementById('valid_start').value,end:document.getElementById('valid_end').value},
+  };
+  if(hs&&he)periods.hindcast={start:hs,end:he};
+  if(fs&&fe)periods.forecast={start:fs,end:fe};
+  const reach_raw=document.getElementById('reach_ids').value.trim();
+  const swat_exe=document.getElementById('swat_exe')?.value?.trim()||'';
+  return{
+    paths:{work_dir:'.',results_dir:'sufi2_results',swat_exe:swat_exe||null,par_inf:null},
+    calibration:{
+      iterations:parseInt(document.getElementById('iterations').value)||null,
+      n_samples:parseInt(document.getElementById('n_samples').value)||null,
+      obj_func:document.getElementById('obj_func').value||null,
+      top_fraction:parseFloat(document.getElementById('top_fraction').value)||null,
+      warmup_years:parseInt(document.getElementById('warmup_years').value)||0,
+      seed:parseInt(document.getElementById('seed').value)||42,
+      reach_weights,
+    },
+    periods,
+    reach_ids:reach_raw?reach_raw.split(',').map(x=>parseInt(x.trim())).filter(n=>!isNaN(n)):null,
+  };
+}
+
+function validateForm(){
+  const required=[
+    ['iterations','Iterations'],['n_samples','Samples per Iteration'],
+    ['obj_func','Objective Function'],['top_fraction','Top Fraction'],
+    ['warmup_years','Warm-up Years'],['seed','Random Seed'],
+    ['calib_start','Calibration Start'],['calib_end','Calibration End'],
+    ['valid_start','Validation Start'],['valid_end','Validation End'],
+  ];
+  for(const[id,label]of required){
+    const el=document.getElementById(id);
+    if(!el||!el.value.trim()){toast(`${label} is required`,'err');el?.focus();return false}
+  }
+  return true;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase runners
+// ════════════════════════════════════════════════════════════════════════════
+async function startCalibration(){
+  if(allParams.length===0)await loadParams();
+  if(!validateForm())return;
+  const cfg=buildConfig();if(!cfg)return;
+  const sel=getSelectedParams();
+  if(!sel.length){toast('Select at least one parameter','err');return}
+  if(!uploadedFiles.length){toast('Upload your TxtInOut files first','err');return}
+
+  const fd=new FormData();
+  fd.append('config_json',JSON.stringify({...cfg,_selected_params:sel}));
+  for(const f of uploadedFiles)fd.append('data_files',f,f.name);
+
+  try{
+    const res=await fetch('/jobs/calibrate',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Submission failed','err');return}
+    activeJobId=data.job_id;
+
+    document.getElementById('val-period').textContent=`${cfg.periods.validation.start} → ${cfg.periods.validation.end}`;
+    document.getElementById('hind-period').textContent=cfg.periods.hindcast?`${cfg.periods.hindcast.start} → ${cfg.periods.hindcast.end}`:'Not configured';
+    document.getElementById('fore-period').textContent=cfg.periods.forecast?`${cfg.periods.forecast.start} → ${cfg.periods.forecast.end}`:'Not configured';
+
+    unlockStep('calibration');
+    goStep('calibration');
+    document.getElementById('calib-jobId').textContent=activeJobId;
+    monitorPhase('calibration',activeJobId,()=>{
+      markStepDone('calibration');
+      unlockStep('validation');
+      unlockStep('results');
+      document.getElementById('calib-summary').classList.remove('hidden');
+      document.getElementById('calib-summary-body').innerHTML=`<p class="text-sm text-muted">Job <code>${activeJobId}</code> complete. Best parameters saved to <code>sufi2_results/best_parameters.csv</code>.</p>`;
+    });
+    toast(`Job ${activeJobId} started`,'ok');
+  }catch(e){toast('Network error: '+e.message,'err')}
+}
+
+async function runValidation(){
+  if(!activeJobId){toast('No active job','err');return}
+  document.getElementById('val-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/validate`,{method:'POST'});
+    const data=await res.json();
+    if(!res.ok){toast(data.detail||'Failed','err');document.getElementById('val-run-btn').disabled=false;return}
+    monitorPhase('validation',activeJobId,()=>{
+      markStepDone('validation');
+      unlockStep('forecast');
+      unlockStep('results');
+      showValidationMetrics();
+      document.getElementById('val-results').classList.remove('hidden');
+    });
+  }catch(e){toast('Error: '+e.message,'err');document.getElementById('val-run-btn').disabled=false}
+}
+
+async function runHindcast(){
+  if(!activeJobId){toast('No active job','err');return}
+  document.getElementById('hind-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/hindcast`,{method:'POST'});
+    if(!res.ok){const d=await res.json();toast(d.detail||'Failed','err');document.getElementById('hind-run-btn').disabled=false;return}
+    monitorPhase('hindcast',activeJobId,()=>showPeriodStats('hindcast'));
+  }catch(e){toast('Error: '+e.message,'err');document.getElementById('hind-run-btn').disabled=false}
+}
+
+async function runForecast(){
+  if(!activeJobId){toast('No active job','err');return}
+  document.getElementById('fore-run-btn').disabled=true;
+  try{
+    const res=await fetch(`/jobs/${activeJobId}/forecast`,{method:'POST'});
+    if(!res.ok){const d=await res.json();toast(d.detail||'Failed','err');document.getElementById('fore-run-btn').disabled=false;return}
+    monitorPhase('forecast',activeJobId,()=>showPeriodStats('forecast'));
+  }catch(e){toast('Error: '+e.message,'err');document.getElementById('fore-run-btn').disabled=false}
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Monitor
+// ════════════════════════════════════════════════════════════════════════════
+const PHASE_ELS={
+  calibration:{bar:'calib-bar',badge:'calib-badge',pct:'calib-pct',log:'calib-log'},
+  validation: {bar:'val-bar',  badge:'val-badge',  pct:null,       log:'val-log'},
+  hindcast:   {bar:'hind-bar', badge:null,          pct:null,       log:'hind-log'},
+  forecast:   {bar:'fore-bar', badge:null,          pct:null,       log:'fore-log'},
+};
+
+function monitorPhase(phase,jobId,onDone){
+  const els=PHASE_ELS[phase];if(!els)return;
+  if(sseSource)sseSource.close();
+  const logEl=document.getElementById(els.log);
+  logEl.textContent='';
+  sseSource=new EventSource(`/jobs/${jobId}/logs`);
+  sseSource.onmessage=e=>{
+    const d=document.createElement('div');
+    d.textContent=e.data;
+    if(e.data.includes('ERROR'))d.className='log-error';
+    else if(e.data.includes('WARNING'))d.className='log-warn';
+    else if(e.data.includes('✓')||e.data.includes('complete'))d.className='log-ok';
+    logEl.appendChild(d);logEl.scrollTop=logEl.scrollHeight;
+    appendSessionLog(e.data);
+    if(e.data.startsWith('[STREAM END'))sseSource.close();
+  };
+  sseSource.onerror=()=>sseSource.close();
+
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    try{
+      const data=await(await fetch(`/jobs/${jobId}/status`)).json();
+      const pct=data.progress||0;
+      if(els.bar)document.getElementById(els.bar).style.width=pct+'%';
+      if(els.pct)document.getElementById(els.pct).textContent=pct.toFixed(1)+'%';
+      if(els.badge){const b=document.getElementById(els.badge);b.textContent=data.status;b.className=`badge badge-${data.status}`}
+      if(data.status==='done'){
+        clearInterval(pollTimer);
+        toast(`${phase} complete ✓`,'ok');
+        if(onDone)onDone(data.result);
+      }else if(data.status==='error'){
+        clearInterval(pollTimer);
+        toast(`${phase} failed: ${data.error||'unknown'}`,'err');
+      }
+    }catch{}
+  },2000);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Results display
+// ════════════════════════════════════════════════════════════════════════════
+async function showValidationMetrics(){
+  if(!activeJobId)return;
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/status`)).json();
+    const metrics=data.result?.metrics||{};
+    const tbody=document.getElementById('val-metrics-body');
+    if(!Object.keys(metrics).length){tbody.innerHTML='<tr><td colspan="6" class="text-muted">No metrics</td></tr>';return}
+    function rating(nse){return nse>=0.75?'Very Good':nse>=0.65?'Good':nse>=0.50?'Satisfactory':nse>=0.36?'Unsatisfactory':'Poor'}
+    function cls(nse){return nse>=0.65?'good':nse>=0.50?'warn':'bad'}
+    tbody.innerHTML=Object.entries(metrics).map(([rid,m])=>`
+      <tr>
+        <td><strong>Reach ${rid}</strong></td>
+        <td class="${cls(m.NSE)}">${m.NSE?.toFixed(3)??'—'}</td>
+        <td class="${cls(m.KGE)}">${m.KGE?.toFixed(3)??'—'}</td>
+        <td class="${cls(m.R2)}">${m.R2?.toFixed(3)??'—'}</td>
+        <td class="${Math.abs(m.PBIAS||0)<10?'good':Math.abs(m.PBIAS||0)<25?'warn':'bad'}">${m.PBIAS?.toFixed(1)??'—'}</td>
+        <td><span class="badge ${cls(m.NSE)==='good'?'badge-done':cls(m.NSE)==='warn'?'badge-running':'badge-error'}">${rating(m.NSE)}</span></td>
+      </tr>`).join('');
+    // Mirror to results tab
+    renderResultsMetrics(metrics);
+  }catch(e){console.error(e)}
+}
+
+function renderResultsMetrics(metrics){
+  if(!metrics&&!activeJobId)return;
+  const el=document.getElementById('results-metrics-body');
+  if(!metrics||!Object.keys(metrics).length){el.innerHTML='<p class="text-sm text-muted">Run validation to see metrics.</p>';return}
+  function cls(v){return v>=0.65?'good':v>=0.50?'warn':'bad'}
+  function rating(nse){return nse>=0.75?'Very Good':nse>=0.65?'Good':nse>=0.50?'Satisfactory':'Poor'}
+  el.innerHTML=`<table class="metrics"><thead><tr><th>Reach</th><th>NSE</th><th>KGE</th><th>R²</th><th>PBIAS (%)</th><th>Rating</th></tr></thead><tbody>${
+    Object.entries(metrics).map(([rid,m])=>`<tr><td><strong>Reach ${rid}</strong></td><td class="${cls(m.NSE)}">${m.NSE?.toFixed(3)??'—'}</td><td class="${cls(m.KGE)}">${m.KGE?.toFixed(3)??'—'}</td><td class="${cls(m.R2)}">${m.R2?.toFixed(3)??'—'}</td><td class="${Math.abs(m.PBIAS||0)<10?'good':Math.abs(m.PBIAS||0)<25?'warn':'bad'}">${m.PBIAS?.toFixed(1)??'—'}</td><td><span class="badge ${cls(m.NSE)==='good'?'badge-done':'badge-running'}">${rating(m.NSE)}</span></td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+async function renderBestParams(){
+  if(!activeJobId)return;
+  const el=document.getElementById('results-params-body');
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/files`)).json();
+    const bpFile=data.files?.find(f=>f.path==='best_parameters.csv');
+    if(!bpFile){el.innerHTML='<p class="text-sm text-muted">Run calibration to see best parameters.</p>';return}
+    // Fetch via image endpoint won't work for CSV — fetch via results zip would be complex
+    // Show a note pointing to the download instead
+    el.innerHTML=`<div class="banner banner-info"><span>📄</span><span>Best parameters saved to <code>best_parameters.csv</code> (${bpFile.size_kb} KB). Download the ZIP to view the full table.</span></div>`;
+  }catch{}
+}
+
+async function loadCharts(){
+  if(!activeJobId)return;
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/files`)).json();
+    const files=data.files||[];
+    const imgUrl=p=>`/jobs/${activeJobId}/image?path=${encodeURIComponent(p)}`;
+
+    // 95PPU — one per reach per iteration
+    const ppuFiles=files.filter(f=>f.path.includes('95ppu_rch')&&f.path.endsWith('.png'));
+    renderChartGrid('charts-ppu', ppuFiles.map(f=>({
+      title: f.path.replace('calibration/','').replace('.png','').replace(/_/g,' '),
+      src: imgUrl(f.path),
+    })));
+
+    // Sensitivity — one per reach per iteration
+    const sensFiles=files.filter(f=>f.path.includes('sensitivity_rch')&&f.path.endsWith('.png'));
+    renderChartGrid('charts-sensitivity', sensFiles.map(f=>({
+      title: f.path.replace('calibration/','').replace('.png','').replace(/_/g,' '),
+      src: imgUrl(f.path),
+    })));
+
+    // Dotty — one per reach per iteration
+    const dottyFiles=files.filter(f=>f.path.includes('dotty_rch')&&f.path.endsWith('.png'));
+    renderChartGrid('charts-dotty', dottyFiles.map(f=>({
+      title: f.path.replace('calibration/','').replace('.png','').replace(/_/g,' '),
+      src: imgUrl(f.path),
+    })));
+
+    // Convergence
+    const convFiles=files.filter(f=>f.path.includes('convergence')&&f.path.endsWith('.png'));
+    renderChartGrid('charts-convergence', convFiles.map(f=>({
+      title:'NSE Convergence across Iterations',
+      src: imgUrl(f.path),
+    })));
+
+    // Validation plots
+    const valFiles=files.filter(f=>f.path.startsWith('validation/')&&f.path.endsWith('.png'));
+    if(valFiles.length){
+      // Insert validation charts section if not present
+      let vc=document.getElementById('charts-validation');
+      if(!vc){
+        const card=document.createElement('div');
+        card.className='card';
+        card.innerHTML=`<div class="card-header"><span class="card-title">Validation Plots — Per Reach</span></div><div class="charts-grid" id="charts-validation"></div>`;
+        document.getElementById('charts-convergence').closest('.card').after(card);
+        vc=document.getElementById('charts-validation');
+      }
+      renderChartGrid('charts-validation', valFiles.map(f=>({
+        title: f.path.replace('validation/','').replace('.png','').replace(/_/g,' '),
+        src: imgUrl(f.path),
+      })));
+    }
+  }catch(e){console.error('loadCharts error',e)}
+}
+
+function renderChartGrid(containerId, charts){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  if(!charts.length){el.innerHTML='<p class="text-sm text-muted" style="padding:.5rem">No charts available yet.</p>';return}
+  el.innerHTML=charts.map(c=>`
+    <div class="chart-card">
+      <div class="chart-card-header">${escHtml(c.title)}</div>
+      <img src="${c.src}" alt="${escHtml(c.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=chart-empty>Chart not available</div>'"/>
+    </div>`).join('');
+}
+
+async function showPeriodStats(phase){
+  const statsEl=document.getElementById(`${phase==='hindcast'?'hind':'fore'}-stats`);
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/status`)).json();
+    const stats=data.result?.reach_stats||{};
+    if(!Object.keys(stats).length){statsEl.innerHTML='<p class="text-sm text-muted">No output in this period.</p>';statsEl.classList.remove('hidden');return}
+    statsEl.innerHTML=`<table class="metrics" style="font-size:.78rem"><thead><tr><th>Reach</th><th>Months</th><th>Mean (m³/s)</th><th>Min</th><th>Max</th></tr></thead><tbody>${
+      Object.entries(stats).map(([rid,s])=>`<tr><td><strong>${rid}</strong></td><td>${s.n_months}</td><td>${s.mean?.toFixed(3)}</td><td>${s.min?.toFixed(3)}</td><td>${s.max?.toFixed(3)}</td></tr>`).join('')
+    }</tbody></table>`;
+    statsEl.classList.remove('hidden');
+  }catch{}
+}
+
+async function loadResultFiles(){
+  if(!activeJobId){document.getElementById('fileList').innerHTML='<p class="text-sm text-muted">No active job.</p>';return}
+  try{
+    const data=await(await fetch(`/jobs/${activeJobId}/files`)).json();
+    const files=data.files||[];
+    if(!files.length){document.getElementById('fileList').innerHTML='<p class="text-sm text-muted">No files yet.</p>';return}
+    const groups={};
+    for(const f of files){const folder=f.path.split('/')[0];(groups[folder]=groups[folder]||[]).push(f)}
+    let html='';
+    for(const[folder,items]of Object.entries(groups)){
+      html+=`<div class="fb-folder">📁 ${folder}/</div>`;
+      html+=items.map(f=>`<div class="fb-item"><span>${f.path.split('/').slice(1).join('/')}</span><span class="fb-size">${f.size_kb} KB</span></div>`).join('');
+    }
+    document.getElementById('fileList').innerHTML=html;
+  }catch(e){document.getElementById('fileList').innerHTML=`<div style="color:var(--error)">Error: ${e.message}</div>`}
+}
+
+function downloadResults(){
+  if(!activeJobId){toast('No active job','err');return}
+  window.location.href=`/jobs/${activeJobId}/results`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Project save / load / export / import
+// ════════════════════════════════════════════════════════════════════════════
+function getProjectState(){
+  return{
+    name:document.getElementById('projectNameInput').value.trim()||'Untitled',
+    config:buildConfig(),
+    params:getSelectedParams(),
+    savedAt:new Date().toISOString(),
+    version:VERSION,
+  };
+}
+
+function applyProjectState(state){
+  if(!state)return;
+  const cfg=state.config||{};
+  const cal=cfg.calibration||{};
+  const per=cfg.periods||{};
+
+  if(state.name)document.getElementById('projectNameInput').value=state.name;
+  if(cal.iterations)document.getElementById('iterations').value=cal.iterations;
+  if(cal.n_samples)document.getElementById('n_samples').value=cal.n_samples;
+  if(cal.obj_func)document.getElementById('obj_func').value=cal.obj_func;
+  if(cal.top_fraction)document.getElementById('top_fraction').value=cal.top_fraction;
+  if(cal.warmup_years!==undefined)document.getElementById('warmup_years').value=cal.warmup_years;
+  if(cal.seed)document.getElementById('seed').value=cal.seed;
+  if(cal.reach_weights)document.getElementById('reach_weights').value=JSON.stringify(cal.reach_weights,null,2);
+  if(cfg.reach_ids)document.getElementById('reach_ids').value=cfg.reach_ids.join(',');
+  if(per.calibration){document.getElementById('calib_start').value=per.calibration.start||'';document.getElementById('calib_end').value=per.calibration.end||''}
+  if(per.validation){document.getElementById('valid_start').value=per.validation.start||'';document.getElementById('valid_end').value=per.validation.end||''}
+  if(per.hindcast){document.getElementById('hind_start').value=per.hindcast.start||'';document.getElementById('hind_end').value=per.hindcast.end||''}
+  if(per.forecast){document.getElementById('fore_start').value=per.forecast.start||'';document.getElementById('fore_end').value=per.forecast.end||''}
+
+  // Restore parameter selections
+  if(state.params&&allParams.length){
+    const paramMap=Object.fromEntries(state.params.map(p=>[p.name,p]));
+    allParams.forEach(p=>{
+      const saved=paramMap[p.name];
+      if(saved){p.selected=true;p.min=saved.min;p.max=saved.max;p.change_type=saved.change_type}
+      else p.selected=false;
+    });
+    renderParamTable();updateSelCount();
+  }
+}
+
+function saveProject(){
+  const state=getProjectState();
+  if(!state.name){toast('Enter a project name first','err');return}
+  const key=`sufi2_project_${state.name}`;
+  localStorage.setItem(key,JSON.stringify(state));
+  refreshProjectList();
+  toast(`Project "${state.name}" saved`,'ok');
+}
+
+function refreshProjectList(){
+  const sel=document.getElementById('projectSelect');
+  const current=sel.value;
+  const projects=Object.keys(localStorage).filter(k=>k.startsWith('sufi2_project_')).map(k=>k.replace('sufi2_project_',''));
+  sel.innerHTML='<option value="">— Load saved project —</option>'+projects.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(current)sel.value=current;
+}
+
+function loadProjectFromSelect(sel){
+  if(!sel.value)return;
+  const key=`sufi2_project_${sel.value}`;
+  const state=JSON.parse(localStorage.getItem(key)||'null');
+  if(!state){toast('Project not found','err');return}
+  applyProjectState(state);
+  toast(`Project "${sel.value}" loaded`,'ok');
+}
+
+function exportProject(){
+  const state=getProjectState();
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const name=(state.name||'sufi2_project').replace(/\s+/g,'_').toLowerCase();
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`${name}.json`}).click();
+}
+
+function importProject(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const state=JSON.parse(e.target.result);
+      applyProjectState(state);
+      if(state.name)document.getElementById('projectNameInput').value=state.name;
+      toast(`Project "${state.name||'imported'}" loaded`,'ok');
+    }catch(err){toast('Invalid project file: '+err.message,'err')}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Exports
+// ════════════════════════════════════════════════════════════════════════════
+function downloadConfig(){
+  const cfg=buildConfig();if(!cfg)return;
+  function toYaml(obj,indent=0){const pad='  '.repeat(indent);return Object.entries(obj).map(([k,v])=>{if(v===null)return`${pad}${k}: null`;if(typeof v==='object'&&!Array.isArray(v))return`${pad}${k}:\n${toYaml(v,indent+1)}`;if(Array.isArray(v))return`${pad}${k}: [${v.join(', ')}]`;return`${pad}${k}: ${v}`}).join('\n')}
+  const blob=new Blob([toYaml(cfg)],{type:'text/yaml'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'config.yaml'}).click();
+}
+function downloadParInf(){
+  if(!allParams.length){toast('Visit Setup tab first','info');return}
+  const sel=getSelectedParams();if(!sel.length){toast('No parameters selected','err');return}
+  const lines=['# par_inf.txt — SUFI-2 parameter ranges','# name                    min          max    change_type',...sel.map(p=>`${p.name.padEnd(24)} ${String(p.min).padStart(12)} ${String(p.max).padStart(12)}  ${p.change_type}`)];
+  const blob=new Blob([lines.join('\n')+'\n'],{type:'text/plain'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'par_inf.txt'}).click();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Floating log
+// ════════════════════════════════════════════════════════════════════════════
+function appendSessionLog(line){
+  sessionLogs.push(line);
+  if(line.includes('ERROR')){hasError=true;document.getElementById('floatLogBtn').classList.add('has-error');document.getElementById('floatLogLabel').textContent='Error!'}
+  if(!document.getElementById('logModal').classList.contains('hidden'))renderLogModal();
+}
+function openLogModal(){renderLogModal();document.getElementById('logModal').classList.remove('hidden')}
+function closeLogModal(){document.getElementById('logModal').classList.add('hidden')}
+function renderLogModal(){
+  const el=document.getElementById('logModalContent');
+  if(!sessionLogs.length){el.textContent='No logs yet.';document.getElementById('logModalMeta').textContent='—';return}
+  el.innerHTML=sessionLogs.map(line=>{
+    let color='';
+    if(line.includes('ERROR'))color='color:var(--error)';
+    else if(line.includes('WARNING'))color='color:var(--warning)';
+    else if(line.includes('✓')||line.includes('complete'))color='color:var(--success)';
+    return color?`<span style="${color}">${escHtml(line)}</span>`:escHtml(line);
+  }).join('<br>');
+  el.scrollTop=el.scrollHeight;
+  const errors=sessionLogs.filter(l=>l.includes('ERROR')).length;
+  const warns=sessionLogs.filter(l=>l.includes('WARNING')).length;
+  document.getElementById('logModalMeta').textContent=`${sessionLogs.length} lines · ${errors} error(s) · ${warns} warning(s)`;
+}
+function copyLog(){
+  if(!sessionLogs.length){toast('No logs to copy','info');return}
+  navigator.clipboard.writeText(sessionLogs.join('\n')).then(()=>toast('Logs copied ✓','ok')).catch(()=>{const ta=document.createElement('textarea');ta.value=sessionLogs.join('\n');document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Logs copied ✓','ok')});
+}
+function clearLog(){sessionLogs.length=0;hasError=false;document.getElementById('floatLogBtn').classList.remove('has-error');document.getElementById('floatLogLabel').textContent='Logs';renderLogModal()}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLogModal()});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Drag & drop upload
+// ════════════════════════════════════════════════════════════════════════════
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over')});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+zone.addEventListener('drop',e=>{
+  e.preventDefault();zone.classList.remove('drag-over');
+  const dt=e.dataTransfer;
+  if(dt.files.length){
+    document.getElementById('swatFileUpload').files=dt.files;
+    handleFileUpload({files:dt.files});
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Toast
+// ════════════════════════════════════════════════════════════════════════════
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className=`show t-${type==='err'?'err':type==='ok'?'ok':'info'}`;
+  setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Utils
+// ════════════════════════════════════════════════════════════════════════════
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════════
+waitForServer().then(ok=>{
+  if(ok){loadParams();refreshProjectList()}
+});
+</script>
+</body>
+</html>
