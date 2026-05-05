@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: sufi2-swat-calibration
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: uvicorn sufi2.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    plan: free

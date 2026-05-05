@@ -1,0 +1,570 @@
+[
+  {
+    "name": "SFTMP.bsn",
+    "min": -5.0,
+    "max": 5.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Snowfall temperature (\u00b0C)"
+  },
+  {
+    "name": "SMTMP.bsn",
+    "min": -5.0,
+    "max": 5.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Snow melt base temperature (\u00b0C)"
+  },
+  {
+    "name": "SMFMX.bsn",
+    "min": 0.0,
+    "max": 20.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Max melt rate for snow during year (mm/\u00b0C-day)"
+  },
+  {
+    "name": "SMFMN.bsn",
+    "min": 0.0,
+    "max": 20.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Min melt rate for snow during year (mm/\u00b0C-day)"
+  },
+  {
+    "name": "TIMP.bsn",
+    "min": 0.01,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Snow pack temperature lag factor"
+  },
+  {
+    "name": "SNOCOVMX.bsn",
+    "min": 0.0,
+    "max": 500.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Min snow water content for 100% snow cover (mm)"
+  },
+  {
+    "name": "SNO50COV.bsn",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Snow",
+    "description": "Snow water equiv for 50% snow cover"
+  },
+  {
+    "name": "SURLAG.bsn",
+    "min": 0.05,
+    "max": 24.0,
+    "change_type": "v",
+    "category": "Runoff",
+    "description": "Surface runoff lag time (days)"
+  },
+  {
+    "name": "ADJ_PKR.bsn",
+    "min": 0.5,
+    "max": 2.0,
+    "change_type": "v",
+    "category": "Runoff",
+    "description": "Peak rate adjustment factor for sediment routing"
+  },
+  {
+    "name": "SPCON.bsn",
+    "min": 0.0001,
+    "max": 0.01,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Linear parameter for channel sediment routing"
+  },
+  {
+    "name": "SPEXP.bsn",
+    "min": 1.0,
+    "max": 2.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Exponent parameter for channel sediment routing"
+  },
+  {
+    "name": "ESCO.bsn",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Soil evaporation compensation factor (basin level)"
+  },
+  {
+    "name": "EPCO.bsn",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Plant uptake compensation factor (basin level)"
+  },
+  {
+    "name": "EVLAI.bsn",
+    "min": 0.0,
+    "max": 10.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Leaf area index for ET"
+  },
+  {
+    "name": "FFCB.bsn",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Soil",
+    "description": "Initial soil water storage expressed as fraction of field capacity"
+  },
+  {
+    "name": "ESCO.hru",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Soil evaporation compensation factor"
+  },
+  {
+    "name": "EPCO.hru",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Plant uptake compensation factor"
+  },
+  {
+    "name": "OV_N.hru",
+    "min": 0.01,
+    "max": 30.0,
+    "change_type": "v",
+    "category": "Runoff",
+    "description": "Manning's n for overland flow"
+  },
+  {
+    "name": "LAT_TTIME.hru",
+    "min": 0.0,
+    "max": 180.0,
+    "change_type": "v",
+    "category": "Lateral Flow",
+    "description": "Lateral flow travel time (days)"
+  },
+  {
+    "name": "SLSUBBSN.hru",
+    "min": 10.0,
+    "max": 150.0,
+    "change_type": "v",
+    "category": "Runoff",
+    "description": "Average slope length (m)"
+  },
+  {
+    "name": "HRU_SLP.hru",
+    "min": 0.0,
+    "max": 0.6,
+    "change_type": "r",
+    "category": "Runoff",
+    "description": "Average slope steepness (m/m)"
+  },
+  {
+    "name": "CANMX.hru",
+    "min": 0.0,
+    "max": 100.0,
+    "change_type": "v",
+    "category": "Evaporation",
+    "description": "Maximum canopy storage (mm)"
+  },
+  {
+    "name": "RSDIN.hru",
+    "min": 0.0,
+    "max": 10000.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Initial residue cover (kg/ha)"
+  },
+  {
+    "name": "CN2.mgt",
+    "min": -0.25,
+    "max": 0.25,
+    "change_type": "r",
+    "category": "Runoff",
+    "description": "SCS runoff curve number (relative change)"
+  },
+  {
+    "name": "USLE_P.mgt",
+    "min": 0.1,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "USLE support practice factor"
+  },
+  {
+    "name": "BIOMIX.mgt",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Soil",
+    "description": "Biological mixing efficiency"
+  },
+  {
+    "name": "ALPHA_BF.gw",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Baseflow alpha factor (days)"
+  },
+  {
+    "name": "GW_DELAY.gw",
+    "min": 0.0,
+    "max": 500.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Groundwater delay (days)"
+  },
+  {
+    "name": "GWQMN.gw",
+    "min": 0.0,
+    "max": 5000.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Threshold depth for return flow (mm)"
+  },
+  {
+    "name": "GW_REVAP.gw",
+    "min": 0.02,
+    "max": 0.2,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Groundwater revap coefficient"
+  },
+  {
+    "name": "REVAPMN.gw",
+    "min": 0.0,
+    "max": 500.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Threshold depth for revap (mm)"
+  },
+  {
+    "name": "RCHRG_DP.gw",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Deep aquifer percolation fraction"
+  },
+  {
+    "name": "GWHT.gw",
+    "min": 0.0,
+    "max": 25.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Initial groundwater height (m)"
+  },
+  {
+    "name": "GW_SPYLD.gw",
+    "min": 0.0,
+    "max": 0.4,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Specific yield of the shallow aquifer"
+  },
+  {
+    "name": "SHALLST.gw",
+    "min": 0.0,
+    "max": 50000.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Initial depth of water in shallow aquifer (mm)"
+  },
+  {
+    "name": "DEEPST.gw",
+    "min": 0.0,
+    "max": 50000.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Initial depth of water in deep aquifer (mm)"
+  },
+  {
+    "name": "ALPHA_BF_D.gw",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Baseflow alpha factor for bank storage (days)"
+  },
+  {
+    "name": "SOL_Z.sol",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Soil",
+    "description": "Depth from soil surface to bottom of layer (mm)"
+  },
+  {
+    "name": "SOL_AWC.sol",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Soil",
+    "description": "Available water capacity of soil layer (mm/mm)"
+  },
+  {
+    "name": "SOL_K.sol",
+    "min": -0.8,
+    "max": 0.8,
+    "change_type": "r",
+    "category": "Soil",
+    "description": "Saturated hydraulic conductivity (mm/hr)"
+  },
+  {
+    "name": "SOL_BD.sol",
+    "min": -0.5,
+    "max": 0.6,
+    "change_type": "r",
+    "category": "Soil",
+    "description": "Moist bulk density (g/cm\u00b3)"
+  },
+  {
+    "name": "SOL_ALB.sol",
+    "min": 0.0,
+    "max": 0.25,
+    "change_type": "v",
+    "category": "Soil",
+    "description": "Moist soil albedo"
+  },
+  {
+    "name": "USLE_K.sol",
+    "min": 0.1,
+    "max": 0.65,
+    "change_type": "r",
+    "category": "Sediment",
+    "description": "USLE soil erodibility factor"
+  },
+  {
+    "name": "SOL_CBN.sol",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Soil",
+    "description": "Organic carbon content (%)"
+  },
+  {
+    "name": "CH_N2.rte",
+    "min": 0.01,
+    "max": 0.3,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Manning's n for main channel"
+  },
+  {
+    "name": "CH_K2.rte",
+    "min": 0.0,
+    "max": 500.0,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Effective hydraulic conductivity of main channel (mm/hr)"
+  },
+  {
+    "name": "CH_W2.rte",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Channel",
+    "description": "Average width of main channel (m)"
+  },
+  {
+    "name": "CH_D2.rte",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Channel",
+    "description": "Average depth of main channel (m)"
+  },
+  {
+    "name": "CH_S2.rte",
+    "min": -0.5,
+    "max": 0.5,
+    "change_type": "r",
+    "category": "Channel",
+    "description": "Average slope of main channel (m/m)"
+  },
+  {
+    "name": "CH_EROD.rte",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Channel erodibility factor"
+  },
+  {
+    "name": "CH_COV.rte",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Channel cover factor"
+  },
+  {
+    "name": "CH_N1.rte",
+    "min": 0.01,
+    "max": 30.0,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Manning's n for tributary channels"
+  },
+  {
+    "name": "CH_K1.rte",
+    "min": 0.0,
+    "max": 300.0,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Effective hydraulic conductivity of tributary channel (mm/hr)"
+  },
+  {
+    "name": "TLAPS.sub",
+    "min": -10.0,
+    "max": 10.0,
+    "change_type": "v",
+    "category": "Climate",
+    "description": "Temperature lapse rate (\u00b0C/km)"
+  },
+  {
+    "name": "PLAPS.sub",
+    "min": -500.0,
+    "max": 500.0,
+    "change_type": "v",
+    "category": "Climate",
+    "description": "Precipitation lapse rate (mm/km)"
+  },
+  {
+    "name": "CH_N1.sub",
+    "min": 0.01,
+    "max": 30.0,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Manning's n for tributary channels (subbasin)"
+  },
+  {
+    "name": "CH_K1.sub",
+    "min": 0.0,
+    "max": 300.0,
+    "change_type": "v",
+    "category": "Channel",
+    "description": "Hydraulic conductivity of tributary channel (subbasin)"
+  },
+  {
+    "name": "PND_K.pnd",
+    "min": 0.0,
+    "max": 2.0,
+    "change_type": "v",
+    "category": "Pond",
+    "description": "Hydraulic conductivity of pond bottom (mm/hr)"
+  },
+  {
+    "name": "PND_N.pnd",
+    "min": 0.01,
+    "max": 0.3,
+    "change_type": "v",
+    "category": "Pond",
+    "description": "Manning's n for pond"
+  },
+  {
+    "name": "MUMAX.wwq",
+    "min": 1.0,
+    "max": 3.0,
+    "change_type": "v",
+    "category": "Water Quality",
+    "description": "Max specific algal growth rate (day\u207b\u00b9)"
+  },
+  {
+    "name": "AI0.wwq",
+    "min": 50.0,
+    "max": 1000.0,
+    "change_type": "v",
+    "category": "Water Quality",
+    "description": "Ratio of chlorophyll a to algal biomass"
+  },
+  {
+    "name": "K_N.wwq",
+    "min": 0.01,
+    "max": 2.0,
+    "change_type": "v",
+    "category": "Water Quality",
+    "description": "Michaelis-Menton half-saturation constant for nitrogen"
+  },
+  {
+    "name": "K_P.wwq",
+    "min": 0.001,
+    "max": 0.1,
+    "change_type": "v",
+    "category": "Water Quality",
+    "description": "Michaelis-Menton half-saturation constant for phosphorus"
+  },
+  {
+    "name": "ALPHA_BNK.rte",
+    "min": 0.0,
+    "max": 1.0,
+    "change_type": "v",
+    "category": "Groundwater",
+    "description": "Baseflow alpha factor for bank storage"
+  },
+  {
+    "name": "SOL_NO3.sol",
+    "min": 0.0,
+    "max": 100.0,
+    "change_type": "v",
+    "category": "Nutrients",
+    "description": "Initial NO3 concentration in soil layer (mg/kg)"
+  },
+  {
+    "name": "SOL_ORGN.sol",
+    "min": 0.0,
+    "max": 10000.0,
+    "change_type": "v",
+    "category": "Nutrients",
+    "description": "Initial organic N in soil layer (mg/kg)"
+  },
+  {
+    "name": "SOL_LABP.sol",
+    "min": 0.0,
+    "max": 200.0,
+    "change_type": "v",
+    "category": "Nutrients",
+    "description": "Initial labile P in soil layer (mg/kg)"
+  },
+  {
+    "name": "SOL_ORGP.sol",
+    "min": 0.0,
+    "max": 4000.0,
+    "change_type": "v",
+    "category": "Nutrients",
+    "description": "Initial organic P in soil layer (mg/kg)"
+  },
+  {
+    "name": "LAT_SED.hru",
+    "min": 0.0,
+    "max": 5000.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Sediment concentration in lateral flow (mg/L)"
+  },
+  {
+    "name": "FILTERW.hru",
+    "min": 0.0,
+    "max": 100.0,
+    "change_type": "v",
+    "category": "Sediment",
+    "description": "Width of edge-of-field filter strip (m)"
+  },
+  {
+    "name": "DEP_IMP.hru",
+    "min": 0.0,
+    "max": 6000.0,
+    "change_type": "v",
+    "category": "Soil",
+    "description": "Depth to impervious layer (mm)"
+  }
+]
