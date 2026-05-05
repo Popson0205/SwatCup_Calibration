@@ -92,13 +92,22 @@ def detect_files(work_dir: Path) -> dict:
     files["cio"] = find_file(work_dir, ["file.cio", "*.cio"], required=False)
     files["rch"] = find_file(work_dir, ["output.rch", "*.rch"], required=False)
 
+    # Accept: observed_flow_rchN.csv (one per reach) OR any CSV with "observed" or "obs"
+    # in the name that contains reach data (wide format)
     obs_files = sorted(work_dir.glob("observed_flow_rch*.csv"))
     if not obs_files:
         obs_files = sorted(work_dir.glob("obs_flow_rch*.csv"))
     if not obs_files:
+        # Try wide-format: observed_flow.csv, observed_flow_all.csv, obs_*.csv etc.
+        obs_files = sorted(work_dir.glob("observed_flow*.csv"))
+    if not obs_files:
+        obs_files = sorted(work_dir.glob("obs_*.csv"))
+    if not obs_files:
         raise FileNotFoundError(
-            "No observed_flow_rchN.csv files found in work_dir. "
-            "Expected: observed_flow_rch<N>.csv (one per reach)."
+            "No observed flow CSV files found in work_dir. "
+            "Expected either:\n"
+            "  - observed_flow_rch16.csv  (one file per reach, columns: date, flow)\n"
+            "  - observed_flow_all_reaches.csv  (wide format, columns: date, rch13, rch15, ...)"
         )
     files["obs"] = obs_files
     files["par"] = find_file(
@@ -150,20 +159,84 @@ def parse_file_cio(cio_path: Path) -> dict:
 
 
 def load_observed_all(obs_files: List[Path], warmup_years: int = 3) -> Dict[int, pd.Series]:
+    """
+    Load observed flow files. Handles two formats:
+
+    Format A — one file per reach (expected):
+        observed_flow_rch16.csv  with columns: date, flow
+
+    Format B — wide format (all reaches in one file):
+        observed_flow_all_reaches.csv  with columns: date, rch13, rch15, rch16, rch17
+        OR any CSV with columns like: date, rch<N>, rch<N>, ...
+    """
     obs_dict: Dict[int, pd.Series] = {}
+
     for f in obs_files:
-        m = re.search(r"rch(\d+)", f.stem, re.IGNORECASE)
-        if not m:
+        df = pd.read_csv(f)
+
+        # Normalise column names
+        df.columns = [c.strip().lower() for c in df.columns]
+
+        # Parse date column — try common names
+        date_col = next((c for c in df.columns if c in ("date","datetime","time","month","year_month")), None)
+        if date_col is None:
+            log.warning("No date column found in %s — skipping", f.name)
             continue
-        reach_id = int(m.group(1))
-        df = pd.read_csv(f, parse_dates=["date"])
-        series = df.set_index("date")["flow"].sort_index()
-        if warmup_years > 0:
-            cutoff = series.index[0] + pd.DateOffset(years=warmup_years)
-            series = series[series.index >= cutoff]
-        obs_dict[reach_id] = series
-        log.info("Reach %3d obs: %d records (%s → %s)",
-                 reach_id, len(series), series.index[0].date(), series.index[-1].date())
+        df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+        df = df.dropna(subset=[date_col])
+        df = df.set_index(date_col)
+        # Normalise to month-start so obs and sim dates align
+        df.index = df.index.map(lambda d: d.replace(day=1))
+
+        # ── Format A: single reach file with a "flow" column ─────────────────
+        if "flow" in df.columns:
+            m = re.search(r"rch(\d+)", f.stem, re.IGNORECASE)
+            if not m:
+                log.warning("Cannot extract reach ID from filename %s — skipping", f.name)
+                continue
+            reach_id = int(m.group(1))
+            series = df["flow"].sort_index().astype(float)
+            if warmup_years > 0:
+                cutoff = series.index[0] + pd.DateOffset(years=warmup_years)
+                series = series[series.index >= cutoff]
+            obs_dict[reach_id] = series
+            log.info("Reach %3d obs (Format A): %d records (%s → %s)",
+                     reach_id, len(series), series.index[0].date(), series.index[-1].date())
+
+        else:
+            # ── Format B: wide format — columns like rch13, rch15, rch16 ──────
+            reach_cols = {c: int(re.search(r"(\d+)", c).group(1))
+                          for c in df.columns
+                          if re.search(r"rch(\d+)", c, re.IGNORECASE)}
+
+            if not reach_cols:
+                # Try numeric column names as reach IDs
+                reach_cols = {}
+                for c in df.columns:
+                    try:
+                        reach_cols[c] = int(c)
+                    except ValueError:
+                        pass
+
+            if not reach_cols:
+                log.warning("No reach columns found in %s — skipping", f.name)
+                continue
+
+            log.info("Wide-format file %s: found reaches %s", f.name, sorted(reach_cols.values()))
+            for col, reach_id in reach_cols.items():
+                series = df[col].sort_index().astype(float)
+                # Drop rows where flow is NaN or 0 at the edges
+                series = series.dropna()
+                if warmup_years > 0:
+                    cutoff = series.index[0] + pd.DateOffset(years=warmup_years)
+                    series = series[series.index >= cutoff]
+                if len(series) == 0:
+                    log.warning("Reach %d: no data after warm-up skip", reach_id)
+                    continue
+                obs_dict[reach_id] = series
+                log.info("Reach %3d obs (Format B): %d records (%s → %s)",
+                         reach_id, len(series), series.index[0].date(), series.index[-1].date())
+
     return obs_dict
 
 
