@@ -1014,8 +1014,7 @@ function renderLogModal() {
     else if (line.includes('WARNING') || line.includes('WARNING')) color = 'color:var(--warning)';
     else if (line.includes('✓') || line.includes('complete')) color = 'color:var(--success)';
     return color ? `<span style="${color}">${escHtml(line)}</span>` : escHtml(line);
-  }).join('
-');
+  }).join('<br>');
   el.scrollTop = el.scrollHeight;
   const errors = sessionLogs.filter(l => l.includes('ERROR')).length;
   const warns  = sessionLogs.filter(l => l.includes('WARNING')).length;
@@ -1029,14 +1028,12 @@ function escHtml(s) {
 
 function copyLog() {
   if (!sessionLogs.length) { toast('No logs to copy', 'info'); return; }
-  navigator.clipboard.writeText(sessionLogs.join('
-'))
+  navigator.clipboard.writeText(sessionLogs.join('\n'))
     .then(() => toast('Logs copied to clipboard ✓', 'ok'))
     .catch(() => {
       // Fallback for browsers without clipboard API
       const ta = document.createElement('textarea');
-      ta.value = sessionLogs.join('
-');
+      ta.value = sessionLogs.join('\n');
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
