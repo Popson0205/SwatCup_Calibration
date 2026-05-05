@@ -134,6 +134,16 @@ def parse_file_cio(cio_path: Path) -> dict:
         if len(lines) >= 11:
             info["n_years"]    = int(v(lines[7]))
             info["start_year"] = int(v(lines[8]))
+            info["idaf"]       = int(v(lines[9]))
+            info["idal"]       = int(v(lines[10]))
+        # Also read NYSKIP — search by keyword since line index varies
+        for line in lines:
+            if "NYSKIP" in line.upper():
+                try:
+                    info["nyskip"] = int(line.strip().split()[0])
+                    break
+                except (ValueError, IndexError):
+                    pass
     except Exception as e:
         log.warning("file.cio parse: %s", e)
     return info
@@ -157,7 +167,7 @@ def load_observed_all(obs_files: List[Path], warmup_years: int = 3) -> Dict[int,
     return obs_dict
 
 
-def load_output_rch(rch_path: Path, reach_ids: Optional[List[int]] = None) -> Tuple[Dict[int, pd.Series], str]:
+def load_output_rch(rch_path: Path, reach_ids: Optional[List[int]] = None, start_year: int = 1990) -> Tuple[Dict[int, pd.Series], str]:
     if rch_path is None:
         raise FileNotFoundError("output.rch not found. Run SWAT once to generate it.")
 
@@ -211,7 +221,8 @@ def load_output_rch(rch_path: Path, reach_ids: Optional[List[int]] = None) -> Tu
             reach_records: dict = {}
             for r in records:
                 reach_records.setdefault(r["rch"], []).append(r["flow"])
-            start_year = 1990
+            # Use start_year from file.cio (IYR + NYSKIP) if available
+            # Default 1990 only if file.cio was not parsed
             for rid, flows in reach_records.items():
                 yr, mo = start_year, 1
                 for f in flows:
@@ -756,7 +767,15 @@ class SUFI2Engine:
         self._reach_ids = reach_ids
 
         self._emit("Loading output.rch …", 0.06)
-        base_sims, _ = load_output_rch(files["rch"], reach_ids=reach_ids)
+        # Compute actual output start year from file.cio
+        # IYR = simulation start year, NYSKIP = warm-up years skipped in output
+        cio_info   = parse_file_cio(files["cio"]) if files["cio"] else {}
+        iyr        = cio_info.get("start_year", 1990)
+        nyskip     = cio_info.get("nyskip", 0)
+        rch_start  = iyr + nyskip
+        log.info("file.cio: IYR=%d NYSKIP=%d → output starts %d", iyr, nyskip, rch_start)
+        self._emit(f"file.cio: simulation starts {iyr}, warm-up {nyskip} yrs → output from {rch_start}", 0.065)
+        base_sims, _ = load_output_rch(files["rch"], reach_ids=reach_ids, start_year=rch_start)
 
 
 
