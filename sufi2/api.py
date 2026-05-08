@@ -96,7 +96,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
-    # X-Frame-Options removed — allow embedding in external dashboards
+    response.headers["X-Frame-Options"]        = "SAMEORIGIN"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
