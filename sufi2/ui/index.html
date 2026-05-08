@@ -1203,7 +1203,7 @@ function filterPickerDropdown(){
     const desc = (p.description||'').substring(0,45).replace(/"/g,'&quot;');
     const cls = already ? 'ppd-item already' : 'ppd-item ppd-clickable';
     return '<div class="'+cls+'" data-pname="'+p.name.replace(/"/g,'&quot;')+'" title="'+desc+'"'
-      +' onmouseenter="showParamTooltip(event, allParamsDB.find(x=>x.name===this.dataset.pname))" onmouseleave="hideParamTooltip()">' 
+      +' onmouseenter="showParamTooltip(event,this)" onmouseleave="hideParamTooltip()">' 
       +'<span class="ppd-name">'+p.name+'</span>'
       +'<span class="ppd-desc">'+desc+'</span>'
       +'<span class="ppd-cat">'+p.category+'</span>'
@@ -1226,13 +1226,16 @@ function showPickerDropdown(){
   if(allParamsDB.length) filterPickerDropdown();
 }
 
-function showParamTooltip(e, p){
+function showParamTooltip(e, el){
   const tt = document.getElementById('paramTooltip');
-  if(!tt || !p) return;
-  tt.innerHTML = `<strong style="color:var(--accent)">${p.name}</strong><br>
-    <span style="color:var(--text3)">${p.category}</span><br><br>
-    ${p.description||'No description available.'}<br><br>
-    <span style="color:var(--text3)">Range: ${p.min} → ${p.max} &nbsp;|&nbsp; Change: <code>${p.change_type}</code></span>`;
+  if(!tt) return;
+  const name = el && el.dataset && el.dataset.pname ? el.dataset.pname : null;
+  const p = name ? allParamsDB.find(x=>x.name===name) : null;
+  if(!p) return;
+  tt.innerHTML = '<strong style="color:var(--accent)">'+p.name+'</strong><br>'
+    +'<span style="color:var(--text3)">'+p.category+'</span><br><br>'
+    +(p.description||'No description available.')+'<br><br>'
+    +'<span style="color:var(--text3)">Range: '+p.min+' → '+p.max+' &nbsp;|&nbsp; Change: <code>'+p.change_type+'</code></span>';
   tt.style.display = 'block';
   tt.style.left = Math.min(e.clientX + 12, window.innerWidth - 300) + 'px';
   tt.style.top  = Math.min(e.clientY + 12, window.innerHeight - 150) + 'px';
@@ -1496,7 +1499,7 @@ async function startCalibration(){
     unlockStep('calibration');
     goStep('calibration');
     document.getElementById('calib-jobId').textContent=activeJobId;
-    monitorPhase('calibration',activeJobId,()=>{
+    monitorPhase('calibration',activeJobId,async()=>{
       markStepDone('calibration');
       unlockStep('validation');
       unlockStep('results');
@@ -1504,7 +1507,6 @@ async function startCalibration(){
       document.getElementById('calib-summary-body').innerHTML=`<p class="text-sm text-muted">Job <code>${activeJobId}</code> complete. Best parameters saved to <code>sufi2_results/best_parameters.csv</code>.</p>`;
       document.getElementById('cancelBtn').style.display='none';
       document.getElementById('restartBtn').style.display='';
-      // Show metrics and milestones
       try{
         const sd=await(await fetch(`/jobs/${activeJobId}/status`)).json();
         if(sd.performance_summary) renderMetricsCard(sd.performance_summary);
