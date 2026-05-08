@@ -1026,32 +1026,52 @@ function renderSelectedParams(){
 
   // Chips
   const catColor = p=>(({'Runoff':'#2f81f7','Groundwater':'#58a6ff','Soil':'#d29922','Snow':'#a5d6ff','Sediment':'#ff7b72','Channel':'#7ee787','Evaporation':'#ffa657','Lateral Flow':'#bc8cff','Climate':'#f0883e','Nutrients':'#3fb950','Pond':'#8b949e','Water Quality':'#79c0ff'})[p]||'var(--text3)');
-  chips.innerHTML = selectedParams.map(p=>`
-    <div class="param-chip">
-      <span class="chip-name">${p.name.split('.')[0]}</span>
-      <span class="chip-cat" style="color:${catColor(p.category)}">${p.category}</span>
-      <button class="chip-remove" onclick="removeParamFromSelected('${p.name}')" title="Remove">✕</button>
-    </div>`).join('');
+  chips.innerHTML = selectedParams.map(p=>{
+    return '<div class="param-chip">'
+      +'<span class="chip-name">'+p.name.split('.')[0]+'</span>'
+      +'<span class="chip-cat" style="color:'+catColor(p.category)+'">'+p.category+'</span>'
+      +'<button class="chip-remove" data-pname="'+p.name.replace(/"/g,'&quot;')+'" title="Remove">✕</button>'
+      +'</div>';
+  }).join('');
+  chips.querySelectorAll('.chip-remove').forEach(btn=>{
+    btn.addEventListener('click', ()=>removeParamFromSelected(btn.dataset.pname));
+  });
 
   // Table
   tableWrap.style.display='';
   tbody.innerHTML = selectedParams.map((p,i)=>{
-    const ext=p.name.split('.')[1]||'';
-    return`<tr>
-      <td><button onclick="removeParamFromSelected('${p.name}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.9rem" title="Remove">✕</button></td>
-      <td><span class="pname">${p.name.split('.')[0]}</span></td>
-      <td><span class="bext ext-${ext}">.${ext}</span></td>
-      <td><span style="font-size:.7rem;color:${catColor(p.category)};font-weight:500">${p.category}</span></td>
-      <td><input type="number" step="any" value="${p.min}" oninput="selectedParams[${i}].min=parseFloat(this.value)"/></td>
-      <td><input type="number" step="any" value="${p.max}" oninput="selectedParams[${i}].max=parseFloat(this.value)"/></td>
-      <td><select onchange="selectedParams[${i}].change_type=this.value">
-        <option value="v" ${p.change_type==='v'?'selected':''}>v</option>
-        <option value="r" ${p.change_type==='r'?'selected':''}>r</option>
-        <option value="a" ${p.change_type==='a'?'selected':''}>a</option>
-      </select></td>
-      <td style="font-size:.72rem;color:var(--text2)">${p.description||''}</td>
-    </tr>`;
+    const ext = p.name.split('.')[1]||'';
+    const selV = p.change_type==='v'?' selected':'';
+    const selR = p.change_type==='r'?' selected':'';
+    const selA = p.change_type==='a'?' selected':'';
+    return '<tr data-idx="'+i+'">'
+      +'<td><button class="row-remove" data-pname="'+p.name.replace(/"/g,'&quot;')+'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:.9rem" title="Remove">✕</button></td>'
+      +'<td><span class="pname">'+p.name.split('.')[0]+'</span></td>'
+      +'<td><span class="bext ext-'+ext+'">.'+ext+'</span></td>'
+      +'<td><span style="font-size:.7rem;color:'+catColor(p.category)+';font-weight:500">'+p.category+'</span></td>'
+      +'<td><input type="number" step="any" value="'+p.min+'" class="p-min" data-idx="'+i+'"/></td>'
+      +'<td><input type="number" step="any" value="'+p.max+'" class="p-max" data-idx="'+i+'"/></td>'
+      +'<td><select class="p-ct" data-idx="'+i+'">'
+        +'<option value="v"'+selV+'>v</option>'
+        +'<option value="r"'+selR+'>r</option>'
+        +'<option value="a"'+selA+'>a</option>'
+      +'</select></td>'
+      +'<td style="font-size:.72rem;color:var(--text2)">'+(p.description||'')+'</td>'
+      +'</tr>';
   }).join('');
+  // Event delegation for table inputs
+  tbody.querySelectorAll('.row-remove').forEach(btn=>{
+    btn.addEventListener('click',()=>removeParamFromSelected(btn.dataset.pname));
+  });
+  tbody.querySelectorAll('.p-min').forEach(inp=>{
+    inp.addEventListener('input',()=>{selectedParams[+inp.dataset.idx].min=parseFloat(inp.value);});
+  });
+  tbody.querySelectorAll('.p-max').forEach(inp=>{
+    inp.addEventListener('input',()=>{selectedParams[+inp.dataset.idx].max=parseFloat(inp.value);});
+  });
+  tbody.querySelectorAll('.p-ct').forEach(sel=>{
+    sel.addEventListener('change',()=>{selectedParams[+sel.dataset.idx].change_type=sel.value;});
+  });
 
   updateSelCount();
 }
@@ -1071,13 +1091,24 @@ function filterPickerDropdown(){
 
   dd.innerHTML = filtered.map(p=>{
     const already = !!selectedParams.find(x=>x.name===p.name);
-    return`<div class="ppd-item ${already?'already':''}" onclick="${already?'':'addParamToSelected(''+p.name+'')'}" title="${p.description||''}">
-      <span class="ppd-name">${p.name}</span>
-      <span class="ppd-desc">${(p.description||'').substring(0,45)}</span>
-      <span class="ppd-cat">${p.category}</span>
-      ${already?'<span style="font-size:.68rem;color:var(--text3);margin-left:.4rem">✓</span>':'<button class="ppd-add" onclick="event.stopPropagation();addParamToSelected(''+p.name+'')">+ Add</button>'}
-    </div>`;
+    const desc = (p.description||'').substring(0,45).replace(/"/g,'&quot;');
+    const cls = already ? 'ppd-item already' : 'ppd-item ppd-clickable';
+    return '<div class="'+cls+'" data-pname="'+p.name.replace(/"/g,'&quot;')+'" title="'+desc+'">'
+      +'<span class="ppd-name">'+p.name+'</span>'
+      +'<span class="ppd-desc">'+desc+'</span>'
+      +'<span class="ppd-cat">'+p.category+'</span>'
+      +(already
+        ? '<span style="font-size:.68rem;color:var(--text3);margin-left:.4rem">✓</span>'
+        : '<button class="ppd-add ppd-add-btn">+ Add</button>')
+      +'</div>';
   }).join('');
+  // Attach click handlers after rendering (avoids all quote issues)
+  dd.querySelectorAll('.ppd-clickable').forEach(el=>{
+    el.addEventListener('click', ()=>addParamToSelected(el.dataset.pname));
+  });
+  dd.querySelectorAll('.ppd-add-btn').forEach(el=>{
+    el.addEventListener('click', e=>{e.stopPropagation();addParamToSelected(el.closest('[data-pname]').dataset.pname);});
+  });
   dd.classList.add('open');
 }
 
