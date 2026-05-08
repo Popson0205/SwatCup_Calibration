@@ -816,7 +816,7 @@ const PARAM_DESCS = {
 };
 const SWAT_EXTS = new Set(['.csv','.rch','.cio','.mgt','.gw','.sol','.hru','.rte','.bsn','.txt','.exe','.pcp','.tmp','.slr','.hmd','.wnd','.fig','.sub','.bsn']);
 
-let allParams     = [];
+// allParams removed - use selectedParams and allParamsDB
 let uploadedFiles = [];
 let activeJobId   = null;
 let sseSource     = null;
@@ -1116,12 +1116,15 @@ function showPickerDropdown(){
   if(allParamsDB.length) filterPickerDropdown();
 }
 
-// Close picker dropdown when clicking outside
+// Close dropdowns when clicking outside
 document.addEventListener('click', e=>{
   if(!e.target.closest('.param-search-wrap')){
     document.getElementById('paramPickerDropdown')?.classList.remove('open');
   }
-  closeMenus();
+  // Close ribbon menus only when clicking outside the ribbon bar
+  if(!e.target.closest('.ribbon-menu') && !e.target.closest('.ribbon-dropdown')){
+    closeMenus();
+  }
 });
 
 function resetRanges(){
@@ -1158,7 +1161,10 @@ function closeMenus(){
   document.querySelectorAll('.ribbon-dropdown').forEach(d=>d.classList.remove('open'));
 }
 function goToStep(n){
-  document.querySelectorAll('.step-btn').forEach((b,i)=>{if(i+1===n)b.click()});
+  // Steps use class="step" and call goStep() — map number to step name
+  const names=['setup','calibration','validation','forecast','results'];
+  const name=names[n-1];
+  if(name) goStep(name);
 }
 function showQuickStart(){ document.getElementById('modal-quickstart').style.display='flex'; }
 function showAbout(){ document.getElementById('modal-about').style.display='flex'; }
@@ -1183,6 +1189,16 @@ function newProject(){
   if(!confirm('Start a new project? Unsaved changes will be lost.')) return;
   localStorage.removeItem('sufi2_active_project');
   location.reload();
+}
+
+function clearAllData(){
+  if(!confirm('Clear all uploaded files and reset the form? This cannot be undone.')) return;
+  selectedParams=[];
+  renderSelectedParams();
+  // Clear file upload zones
+  document.getElementById('uploadedFiles')&&(document.getElementById('uploadedFiles').innerHTML='');
+  document.getElementById('fileList')&&(document.getElementById('fileList').innerHTML='');
+  toast('All data cleared','info');
 }
 function downloadResults(){
   if(!activeJobId){toast('No active job','err');return}
@@ -1241,7 +1257,7 @@ function validateForm(){
 // Phase runners
 // ════════════════════════════════════════════════════════════════════════════
 async function startCalibration(){
-  if(allParams.length===0)await loadParams();
+  if(allParamsDB.length===0)await loadParams();
   if(!validateForm())return;
   const cfg=buildConfig();if(!cfg)return;
   const sel=getSelectedParams();
@@ -1563,25 +1579,47 @@ function applyProjectState(state){
   if(per.hindcast){document.getElementById('hind_start').value=per.hindcast.start||'';document.getElementById('hind_end').value=per.hindcast.end||''}
   if(per.forecast){document.getElementById('fore_start').value=per.forecast.start||'';document.getElementById('fore_end').value=per.forecast.end||''}
 
-  // Restore parameter selections
-  if(state.params&&allParams.length){
-    const paramMap=Object.fromEntries(state.params.map(p=>[p.name,p]));
-    allParams.forEach(p=>{
-      const saved=paramMap[p.name];
-      if(saved){p.selected=true;p.min=saved.min;p.max=saved.max;p.change_type=saved.change_type}
-      else p.selected=false;
+  // Restore parameter selections into selectedParams
+  if(state.params && state.params.length){
+    selectedParams = state.params.map(p=>{
+      const db=allParamsDB.find(x=>x.name===p.name)||{};
+      return Object.assign({},db,p,{_origMin:db.min||p.min,_origMax:db.max||p.max});
     });
-    renderParamTable();updateSelCount();
+    renderSelectedParams();
   }
 }
 
-function saveProject(){
+async function saveProject(){
   const state=getProjectState();
   if(!state.name){toast('Enter a project name first','err');return}
+
+  // Always save to localStorage (quick save)
   const key=`sufi2_project_${state.name}`;
   localStorage.setItem(key,JSON.stringify(state));
   refreshProjectList();
-  toast(`Project "${state.name}" saved`,'ok');
+
+  // Offer to also save to a file with folder picker
+  const json=JSON.stringify(state,null,2);
+  const fileName=(state.name||'sufi2_project').replace(/\s+/g,'_').toLowerCase()+'.json';
+
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types:[{description:'SUFI-2 Project',accept:{'application/json':['.json']}}],
+        startIn: 'documents'
+      });
+      const w=await fh.createWritable();
+      await w.write(json);
+      await w.close();
+      toast(`Saved to file: ${fh.name}`,'ok');
+    }catch(e){
+      if(e.name!=='AbortError') toast('File save failed: '+e.message,'err');
+      else toast(`Project "${state.name}" saved to browser storage`,'ok');
+    }
+  } else {
+    toast(`Project "${state.name}" saved to browser storage`,'ok');
+  }
 }
 
 function refreshProjectList(){
@@ -1601,11 +1639,30 @@ function loadProjectFromSelect(sel){
   toast(`Project "${sel.value}" loaded`,'ok');
 }
 
-function exportProject(){
+async function exportProject(){
   const state=getProjectState();
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const name=(state.name||'sufi2_project').replace(/\s+/g,'_').toLowerCase();
-  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`${name}.json`}).click();
+  const json=JSON.stringify(state,null,2);
+  const fileName=(state.name||'sufi2_project').replace(/\s+/g,'_').toLowerCase()+'.json';
+
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types:[{description:'SUFI-2 Project',accept:{'application/json':['.json']}}],
+        startIn: 'documents'
+      });
+      const w=await fh.createWritable();
+      await w.write(json);
+      await w.close();
+      toast(`Exported to: ${fh.name}`,'ok');
+      return;
+    }catch(e){
+      if(e.name==='AbortError') return; // user cancelled
+    }
+  }
+  // Fallback: browser download
+  const blob=new Blob([json],{type:'application/json'});
+  Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:fileName}).click();
 }
 
 function importProject(input){
@@ -1626,17 +1683,47 @@ function importProject(input){
 // ════════════════════════════════════════════════════════════════════════════
 // Exports
 // ════════════════════════════════════════════════════════════════════════════
-function downloadConfig(){
+async function downloadConfig(){
   const cfg=buildConfig();if(!cfg)return;
   function toYaml(obj,indent=0){const pad='  '.repeat(indent);return Object.entries(obj).map(([k,v])=>{if(v===null)return`${pad}${k}: null`;if(typeof v==='object'&&!Array.isArray(v))return`${pad}${k}:\n${toYaml(v,indent+1)}`;if(Array.isArray(v))return`${pad}${k}: [${v.join(', ')}]`;return`${pad}${k}: ${v}`}).join('\n')}
-  const blob=new Blob([toYaml(cfg)],{type:'text/yaml'});
+  const content=toYaml(cfg);
+
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({
+        suggestedName:'config.yaml',
+        types:[{description:'YAML Config',accept:{'text/yaml':['.yaml','.yml']}}],
+        startIn:'documents'
+      });
+      const w=await fh.createWritable();
+      await w.write(content);
+      await w.close();
+      toast(`Saved: ${fh.name}`,'ok');
+      return;
+    }catch(e){if(e.name==='AbortError')return;}
+  }
+  const blob=new Blob([content],{type:'text/yaml'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'config.yaml'}).click();
 }
-function downloadParInf(){
-  if(!allParams.length){toast('Visit Setup tab first','info');return}
-  const sel=getSelectedParams();if(!sel.length){toast('No parameters selected','err');return}
+async function downloadParInf(){
+  const sel=getSelectedParams();if(!sel.length){toast('No parameters selected — add parameters first','err');return}
   const lines=['# par_inf.txt — SUFI-2 parameter ranges','# name                    min          max    change_type',...sel.map(p=>`${p.name.padEnd(24)} ${String(p.min).padStart(12)} ${String(p.max).padStart(12)}  ${p.change_type}`)];
-  const blob=new Blob([lines.join('\n')+'\n'],{type:'text/plain'});
+  const content=lines.join('\n')+'\n';
+  if(window.showSaveFilePicker){
+    try{
+      const fh=await window.showSaveFilePicker({
+        suggestedName:'par_inf.txt',
+        types:[{description:'Parameter File',accept:{'text/plain':['.txt']}}],
+        startIn:'documents'
+      });
+      const w=await fh.createWritable();
+      await w.write(content);
+      await w.close();
+      toast(`Saved: ${fh.name}`,'ok');
+      return;
+    }catch(e){if(e.name==='AbortError')return;}
+  }
+  const blob=new Blob([content],{type:'text/plain'});
   Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:'par_inf.txt'}).click();
 }
 
