@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>SUFI-2 SWAT Calibration Tool</title>
+<title>Hydro-Modeller</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -293,7 +293,7 @@ details[open] summary::before{content:'▼ '}
   <!-- Logo / Title -->
   <div class="ribbon-logo">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-    SUFI-2
+    Hydro-Modeller
   </div>
 
   <!-- File Menu -->
@@ -373,7 +373,7 @@ details[open] summary::before{content:'▼ '}
       <button onclick="showFileFormats();closeMenus()">📄 File Format Guide</button>
       <div class="rd-sep"></div>
       <div class="rd-section">About</div>
-      <button onclick="showAbout();closeMenus()">ℹ About SUFI-2 Tool</button>
+      <button onclick="showAbout();closeMenus()">ℹ About Hydro-Modeller</button>
       <button onclick="window.open('https://github.com/your-org/sufi2-swat','_blank');closeMenus()">⭐ GitHub Repository</button>
       <button onclick="window.open('/docs','_blank');closeMenus()">🔗 API Reference</button>
     </div>
@@ -409,12 +409,12 @@ details[open] summary::before{content:'▼ '}
 
 <div id="modal-about" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box" style="max-width:420px">
-    <div class="modal-header"><strong>About SUFI-2 SWAT Calibration</strong><button onclick="this.closest('.modal-overlay').style.display='none'">✕</button></div>
+    <div class="modal-header"><strong>About Hydro-Modeller</strong><button onclick="this.closest('.modal-overlay').style.display='none'">✕</button></div>
     <div class="modal-body" style="font-size:.85rem;line-height:1.7;text-align:center">
       <div style="font-size:2rem;margin:.5rem 0">📡</div>
-      <strong>SUFI-2 SWAT Calibration Tool</strong><br>
+      <strong>Hydro-Modeller</strong><br>
       Version 2.0<br><br>
-      <span style="color:var(--text2)">Sequential Uncertainty Fitting v2 (SUFI-2)<br>for SWAT hydrological model calibration</span><br><br>
+      <span style="color:var(--text2)">SWAT Hydrological Model Calibration Tool<br>Sequential Uncertainty Fitting v2 (SUFI-2)</span><br><br>
       <span style="font-size:.75rem;color:var(--text3)">Built with FastAPI · Electron · Plotly<br>MIT License</span>
     </div>
   </div>
@@ -1606,7 +1606,7 @@ async function saveProject(){
     try{
       const fh=await window.showSaveFilePicker({
         suggestedName: fileName,
-        types:[{description:'SUFI-2 Project',accept:{'application/json':['.json']}}],
+        types:[{description:'Hydro-Modeller Project',accept:{'application/json':['.json']}}],
         startIn: 'documents'
       });
       const w=await fh.createWritable();
@@ -1648,7 +1648,7 @@ async function exportProject(){
     try{
       const fh=await window.showSaveFilePicker({
         suggestedName: fileName,
-        types:[{description:'SUFI-2 Project',accept:{'application/json':['.json']}}],
+        types:[{description:'Hydro-Modeller Project',accept:{'application/json':['.json']}}],
         startIn: 'documents'
       });
       const w=await fh.createWritable();
